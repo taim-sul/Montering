@@ -2,7 +2,7 @@
   "name": "Smart Logistics Admin",
   "short_name": "SL Admin",
   "description": "Smart Logistics Administrator Panel",
-  "start_url": "/Montering/Admin/admin.html",
+  "start_url": "/Montering/Admin/index.html",
   "scope": "/Montering/Admin/",
   "display": "standalone",
   "background_color": "#0A0A0F",
