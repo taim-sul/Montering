@@ -410,7 +410,10 @@
   }
 
   // ── ASSIGN TEAM ───────────────────────────────────────────────
-  async function assignTeam(orderId, teamId, serviceDate) {
+  async function assignTeam(orderId, teamId) {
+    // Read the date live from the DOM to avoid stale render-time values
+    const card = document.querySelector(`.order-card[data-id="${orderId}"]`);
+    const serviceDate = card?.querySelector('.date-input')?.value || getTomorrow();
     try {
       await updateDoc(doc(db, 'orders', orderId), {
         teamId,
@@ -548,7 +551,7 @@
           </div>
           <div class="order-field">
             <label>${t().team}</label>
-            <select class="team-select" onchange="assignTeam('${order.id}', this.value, '${order.serviceDate || getTomorrow()}')">
+            <select class="team-select" onchange="assignTeam('${order.id}', this.value)">
               <option value="">${t().selectTeam}</option>
               ${TEAMS.map(tm => `<option value="${tm.id}" ${order.teamId === tm.id ? 'selected' : ''}>${tm.name}</option>`).join('')}
             </select>
