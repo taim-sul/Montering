@@ -137,6 +137,90 @@
   const tomorrow = () => { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().split('T')[0]; };
   const today = () => new Date().toISOString().split('T')[0];
 
+
+  // ── THEME ────────────────────────────────────────────────────
+  let currentTheme = localStorage.getItem('sl_theme') || 'dark';
+  function applyTheme() { document.body.classList.toggle('light', currentTheme === 'light'); }
+  function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('sl_theme', currentTheme);
+    applyTheme();
+    if (currentTeam) renderHeader();
+  }
+  window.toggleTheme = toggleTheme;
+
+  // ── SYNC ─────────────────────────────────────────────────────
+  let syncState = 'syncing';
+  function setSyncState(state) {
+    syncState = state;
+    const el = document.getElementById('syncPill');
+    if (!el) return;
+    const labels = { synced: 'Synk', syncing: '...', offline: 'Offline' };
+    el.className = `sync-pill ${state}`;
+    el.innerHTML = `<div class="sync-dot ${state==='syncing'?'pulse':''}"></div>${labels[state]}`;
+  }
+  window.addEventListener('online', () => setSyncState('synced'));
+  window.addEventListener('offline', () => setSyncState('offline'));
+
+  // ── INSTALL PROMPT ───────────────────────────────────────────
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferredPrompt = e;
+    if (!localStorage.getItem('sl_install_dismissed')) showInstallBanner();
+  });
+  function showInstallBanner() {
+    if (document.getElementById('installBanner')) return;
+    const b = document.createElement('div');
+    b.id = 'installBanner'; b.className = 'install-banner';
+    b.innerHTML = `
+      <span style="font-size:1.8rem">📱</span>
+      <div class="install-text flex:1">
+        <strong>Installer app</strong>
+        <span>Tilføj til startskærm for hurtig adgang</span>
+      </div>
+      <button class="install-btn" onclick="doInstall()">Installer</button>
+      <button class="install-x" onclick="dismissInstall()">✕</button>
+    `;
+    document.body.appendChild(b);
+  }
+  async function doInstall() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById('installBanner')?.remove();
+  }
+  function dismissInstall() {
+    localStorage.setItem('sl_install_dismissed','1');
+    document.getElementById('installBanner')?.remove();
+  }
+
+  function checkIOSInstall() {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone;
+    const dismissed = localStorage.getItem('sl_ios_dismissed');
+    if (isIOS && !isStandalone && !dismissed) {
+      setTimeout(showIOSBanner, 2000);
+    }
+  }
+  function showIOSBanner() {
+    if (document.getElementById('iosBanner')) return;
+    const b = document.createElement('div');
+    b.id = 'iosBanner'; b.className = 'install-banner';
+    b.style.bottom = '1.5rem';
+    b.innerHTML = `
+      <span style="font-size:1.8rem">📱</span>
+      <div style="flex:1">
+        <strong style="display:block;font-size:.9rem">Installer på iPhone</strong>
+        <span style="font-size:.78rem;color:var(--text2)">Tryk <b>Del</b> ↑ → <b>Føj til hjemmeskærm</b></span>
+      </div>
+      <button class="install-x" onclick="document.getElementById('iosBanner').remove(); localStorage.setItem('sl_ios_dismissed','1')">✕</button>
+    `;
+    document.body.appendChild(b);
+  }
+  window.doInstall = doInstall;
+  window.dismissInstall = dismissInstall;
+
   function initFirebase() {
     try {
       app = initializeApp(FIREBASE_CONFIG);
@@ -200,7 +284,9 @@
   function startOrderListener() {
     if (!db || !currentTeam) return;
     const q = query(collection(db, 'orders'), where('teamId', '==', currentTeam.id));
+    setSyncState('syncing');
     unsubOrders = onSnapshot(q, snap => {
+      setSyncState('synced');
       myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(o => o.serviceDate === tomorrow() || o.serviceDate === today())
         .sort((a, b) => (a.serviceDate > b.serviceDate ? 1 : -1));
@@ -223,9 +309,11 @@
         <span class="header-title">Smart Logistics</span>
       </div>
       <div class="header-right">
+        <div id="syncPill" class="sync-pill syncing"><div class="sync-dot pulse"></div>...</div>
         <div class="team-pill" style="background:${currentTeam.color}20; color:${currentTeam.color}; border:1px solid ${currentTeam.color}40">
           ● ${currentTeam.name}
         </div>
+        <button class="theme-toggle-btn" onclick="toggleTheme()" title="Tema">${currentTheme==='dark'?'☀️':'🌙'}</button>
         <button class="icon-btn" onclick="toggleLang()" title="Sprog">🌐</button>
         <button class="icon-btn" onclick="logout()" title="Log ud">↩</button>
       </div>
@@ -272,7 +360,7 @@
           </div>
           <div class="status-dot" style="background:${color}20; color:${color}; border:1px solid ${color}40">${statusLabels[order.status] || order.status}</div>
         </div>
-        ${order.customerAddress ? `<div class="order-address-team">📍 ${order.customerAddress}</div>` : ''}
+        ${(order.customerAddress1||order.postalCityState) ? `<div class="order-address-team">📍 ${order.customerAddress1 || ''} ${order.postalCityState ? '· '+order.postalCityState : ''}</div>` : ''}
         <div class="order-actions-team">
           ${order.pdfUrl ? `<a href="${order.pdfUrl}" target="_blank" class="card-btn btn-pdf" onclick="event.stopPropagation()">📄 PDF</a>` : ''}
           ${canStart ? `<div class="card-btn btn-start">${order.status === 'inProgress' ? '▶ Fortsæt' : t().startJob} →</div>` : `<div class="card-btn btn-done">✓ ${t().completed}</div>`}
@@ -299,6 +387,7 @@
         <button class="back-btn" onclick="renderOrderList()">← Tilbage</button>
         <div class="job-title">#${currentOrder.orderNumber}</div>
         <div class="job-customer">${currentOrder.customerName || ''}</div>
+        ${currentOrder.customerAddress1 ? `<div class="job-address">📍 ${currentOrder.customerAddress1}${currentOrder.postalCityState ? ', '+currentOrder.postalCityState : ''}</div>` : ''}
       </div>
       <div class="steps-bar">
         <div class="step-item ${jobStep >= 1 ? 'active' : ''}" onclick="gotoStep(1)">
@@ -679,78 +768,274 @@
   async function submitReport() {
     const status = document.querySelector('input[name="svcStatus"]:checked')?.value;
     if (!status) { showToast('Vælg service status', 'error'); return; }
-
     const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = t().saving;
-
+    btn.disabled = true; btn.textContent = t().saving;
     try {
-      // Collect form data
       const failReasons = [...document.querySelectorAll('input[name="failReason"]:checked')].map(c => c.value);
       const incompleteReasons = [...document.querySelectorAll('input[name="incompleteReason"]:checked')].map(c => c.value);
       const addSvc = document.querySelector('input[name="addSvc"]:checked')?.value === 'yes';
       const contactedIkea = document.querySelector('input[name="ikea"]:checked')?.value === 'yes';
       const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value === 'yes';
       const wallRefuse = document.querySelector('input[name="wallRefuse"]:checked')?.value === 'yes';
-
-      // Upload signatures if they exist
+      const completedAt = new Date().toISOString();
       let techSigUrl = null, customerSigUrl = null, disclaimerSigUrl = null;
       if (techSigData) techSigUrl = await uploadDataURL(techSigData, `sigs/${currentOrder.id}/tech.png`);
       if (customerSigData) customerSigUrl = await uploadDataURL(customerSigData, `sigs/${currentOrder.id}/customer.png`);
       if (disclaimerSigData) disclaimerSigUrl = await uploadDataURL(disclaimerSigData, `sigs/${currentOrder.id}/disclaimer.png`);
-
       const reportData = {
-        orderId: currentOrder.id,
-        orderNumber: currentOrder.orderNumber,
+        orderId: currentOrder.id, orderNumber: currentOrder.orderNumber,
         customerName: currentOrder.customerName || '',
-        customerAddress: currentOrder.customerAddress || '',
-        teamId: currentTeam.id,
-        teamName: currentTeam.name,
-        serviceStatus: status,
-        failedReasons: failReasons,
-        incompleteReasons: incompleteReasons,
+        customerAddress1: currentOrder.customerAddress1 || '',
+        postalCityState: currentOrder.postalCityState || '',
+        teamId: currentTeam.id, teamName: currentTeam.name,
+        serviceStatus: status, failedReasons, incompleteReasons,
         startTime: document.getElementById('startTime')?.value || '',
         endTime: document.getElementById('endTime')?.value || '',
         hoursSpent: document.getElementById('hoursSpent')?.value || '',
         numAssemblers: document.getElementById('numAssemblers')?.value || '',
-        additionalServices: addSvc,
-        contactedIkea,
+        additionalServices: addSvc, contactedIkea,
         ikeaRef: document.getElementById('ikeaRef')?.value || '',
         comments: document.getElementById('reportComments')?.value || '',
-        satisfaction,
-        wallMountRefused: wallRefuse,
-        beforePhotos,
-        afterPhotos,
-        techSignature: techSigUrl,
-        customerSignature: customerSigUrl,
-        disclaimerSignature: disclaimerSigUrl,
-        completedAt: new Date().toISOString(),
-        pdfUrl: currentOrder.pdfUrl || null
+        satisfaction, wallMountRefused: wallRefuse,
+        beforePhotos, afterPhotos,
+        techSignature: techSigUrl, customerSignature: customerSigUrl, disclaimerSignature: disclaimerSigUrl,
+        completedAt, pdfUrl: currentOrder.pdfUrl || null,
+        articles: currentOrder.articles || [],
+        serviceDates: currentOrder.serviceDates || [],
+        serviceProvider: currentOrder.serviceProvider || '',
+        originatingStore: currentOrder.originatingStore || '',
+        techSignatureData: techSigData,
+        customerSignatureData: customerSigData,
+        disclaimerSignatureData: disclaimerSigData,
       };
-
-      // Save report to Firestore
+      showToast('Genererer PDF...', 'info');
+      const reportPdfUrl = await generateAndUploadReportPDF(reportData);
+      reportData.reportPdfUrl = reportPdfUrl;
+      let disclaimerPdfUrl = null;
+      if (wallRefuse && disclaimerSigData) {
+        disclaimerPdfUrl = await generateAndUploadDisclaimerPDF(reportData);
+        reportData.disclaimerPdfUrl = disclaimerPdfUrl;
+      }
       await addDoc(collection(db, 'reports'), reportData);
-
-      // Update order status
       await updateDoc(doc(db, 'orders', currentOrder.id), {
-        status,
-        completedAt: new Date().toISOString(),
-        afterPhotos,
-        jobStep: 3
+        status, completedAt, afterPhotos, jobStep: 3, reportPdfUrl, disclaimerPdfUrl
       });
-
-      // Send email notification via EmailJS or log it
       await sendEmailNotification(reportData);
-
+      showDownloadOptions(reportPdfUrl, disclaimerPdfUrl, reportData.orderNumber);
       showToast(t().reportSubmitted, 'success');
-      setTimeout(() => renderOrderList(), 1500);
-
+      setTimeout(() => renderOrderList(), 4000);
     } catch(e) {
       console.error(e);
       showToast('Fejl ved indsendelse', 'error');
       btn.disabled = false;
       btn.textContent = `📤 ${t().submitReport}`;
     }
+  }
+
+  function showDownloadOptions(reportUrl, disclaimerUrl, orderNum) {
+    const ov = document.createElement('div');
+    ov.className = 'download-overlay';
+    ov.innerHTML = `
+      <div class="download-card">
+        <div style="font-size:2.5rem">✅</div>
+        <h2 style="margin:.5rem 0">Rapport indsendt!</h2>
+        <p style="opacity:.6; font-size:.85rem; margin-bottom:1.5rem">PDF genereret og gemt</p>
+        ${reportUrl ? `<a href="${reportUrl}" download="servicerapport_${orderNum}.pdf" class="download-btn" target="_blank">📄 Download Servicerapport</a>` : ''}
+        ${disclaimerUrl ? `<a href="${disclaimerUrl}" download="ansvarsfraskrivelse_${orderNum}.pdf" class="download-btn" style="background:var(--warning)15;color:var(--warning);border-color:var(--warning)40" target="_blank">⚠️ Download Ansvarsfraskrivelse</a>` : ''}
+        <button class="download-close" onclick="this.closest('.download-overlay').remove()">Luk</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
+  async function loadJsPDF() {
+    if (window.jspdf) return;
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  function drawPdfCheckbox(pdf, x, y, checked, label) {
+    pdf.setLineWidth(0.4);
+    pdf.rect(x, y, 3.5, 3.5);
+    if (checked) { pdf.line(x, y, x+3.5, y+3.5); pdf.line(x+3.5, y, x, y+3.5); }
+    pdf.setFontSize(8.5); pdf.setFont('helvetica','normal');
+    pdf.text(label, x+5, y+3);
+  }
+
+  async function generateAndUploadReportPDF(report) {
+    try {
+      await loadJsPDF();
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:'mm', format:'a4' });
+      const W=210, margin=20;
+      const order = currentOrder;
+
+      const pageHeader = (n) => {
+        pdf.setFontSize(18); pdf.setFont('helvetica','bold');
+        pdf.text('Service Report', W/2, 18, {align:'center'});
+        pdf.setFontSize(11); pdf.setFont('helvetica','normal');
+        pdf.text(`${n}/3`, W-margin, 18, {align:'right'});
+        pdf.setLineWidth(0.3); pdf.line(margin,21,W-margin,21);
+      };
+
+      // PAGE 1
+      pageHeader(1);
+      let y=30; const lh=7;
+      const addF = (lbl, val) => {
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+        pdf.text(lbl, margin, y);
+        pdf.setLineWidth(0.2); pdf.line(margin+65, y+0.5, W-margin, y+0.5);
+        if(val) pdf.text(String(val), margin+66, y);
+        y+=lh;
+      };
+      addF('Print date', new Date().toLocaleDateString('da-DK'));
+      addF('Customer name', order.customerName||'');
+      addF('Customer address 1', order.customerAddress1||'');
+      addF('Customer address 2', '');
+      addF('Customer address 3', '');
+      addF('Postal code/city/state', order.postalCityState||'');
+      addF('Primary phone', '');
+      addF('Secondary phone', '');
+      addF('Mobile phone', order.mobile||'');
+      addF('Email', order.email||'');
+      addF('Service provider', order.serviceProvider||'Bring E-Commerce & Logistics A/S');
+      addF('Service product', order.serviceProduct||'Assembly');
+      addF('Originating store', order.originatingStore||'');
+      addF('Order number', order.orderNumber||'');
+      addF('Delivery order number', order.deliveryOrderNumber||'');
+      addF('Order attachment exists', 'No');
+      addF('Delivery instructions', '');
+      y+=3; pdf.setFontSize(9); pdf.text('Booked service dates', margin, y); y+=lh;
+      (order.serviceDates||[]).forEach(d=>{ pdf.setFontSize(8); pdf.text(d,margin,y); y+=6; });
+
+      // PAGE 2
+      pdf.addPage(); pageHeader(2); y=30;
+      pdf.setFontSize(9); pdf.text('Filled in by service provider',margin,y); y+=lh;
+      const addF2 = (lbl,val) => {
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.text(lbl,margin,y);
+        pdf.setLineWidth(0.2); pdf.line(margin+87,y+0.5,W-margin,y+0.5);
+        if(val) pdf.text(String(val),margin+88,y); y+=lh;
+      };
+      addF2('Service actual start date/time', report.startTime||'');
+      addF2('Service actual end date/time', report.endTime||'');
+      pdf.text('Additional services needed?',margin,y);
+      drawPdfCheckbox(pdf,margin+90,y-3,report.additionalServices,'Yes');
+      drawPdfCheckbox(pdf,margin+112,y-3,!report.additionalServices,'No'); y+=lh;
+      pdf.text('Hours to complete service',margin,y);
+      pdf.line(margin+87,y+0.5,margin+117,y+0.5);
+      if(report.hoursSpent) pdf.text(String(report.hoursSpent),margin+88,y);
+      pdf.text('hours',margin+120,y); y+=lh;
+      addF2('Who performed the service?(team/name)', report.teamName||'');
+      addF2('Number of assemblers', report.numAssemblers||'');
+      pdf.text('SP have been in contact with IKEA?',margin,y);
+      drawPdfCheckbox(pdf,margin+90,y-3,report.contactedIkea,'Yes');
+      drawPdfCheckbox(pdf,margin+112,y-3,!report.contactedIkea,'No'); y+=lh;
+      addF2('Customer service reference id', report.ikeaRef||'');
+      y+=5;
+      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='completed','Service completed'); y+=lh;
+      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='failed','Service failed'); y+=lh;
+      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='incomplete','Service incomplete'); y+=lh+3;
+      pdf.setFontSize(9); pdf.text('Select failed reason code',margin,y); y+=6;
+      [['Customer not home','customerNotHome'],['No/Not enough capacity','noCapacity'],['Payment problems','paymentProblems']]
+        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
+      [['Articles missing','articlesMissing'],['Inappropriate service conditions','inappropriateConditions']]
+        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
+      y+=26;
+      pdf.text('Select incomplete reason code',margin,y); y+=6;
+      [['Articles missing','articlesMissing'],['Damaged articles','damagedArticles'],['Sales error','salesError'],['Installation error','installError']]
+        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
+      [['Incorrect articles','incorrectArticles'],['Pre measurements not correct','preNotCorrect'],['Payment problems','paymentProblems'],['Changed mind','changedMind']]
+        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
+      y+=36;
+      pdf.text('Comments',margin,y); y+=5;
+      if(report.comments){ const ls=pdf.splitTextToSize(report.comments,W-margin*2); pdf.text(ls,margin,y); y+=ls.length*5; }
+      for(let i=0;i<4;i++){ y+=6; pdf.line(margin,y,W-margin,y); }
+      y+=lh;
+      const satLines=pdf.splitTextToSize('The service was without any complaints and performed to the satisfaction of the customer',100);
+      pdf.text(satLines,margin,y);
+      drawPdfCheckbox(pdf,margin+115,y-3,report.satisfaction,'Yes');
+      drawPdfCheckbox(pdf,margin+135,y-3,!report.satisfaction,'No');
+      y=265;
+      pdf.line(margin,y,margin+35,y); pdf.setFontSize(8); pdf.text('Date',margin,y+4);
+      pdf.setFontSize(9); pdf.text(new Date().toLocaleDateString('da-DK'),margin+1,y-1);
+      pdf.line(margin+42,y,margin+125,y); pdf.setFontSize(8); pdf.text('Service provider signature',margin+42,y+4);
+      if(report.techSignatureData){ try{pdf.addImage(report.techSignatureData,'PNG',margin+42,y-17,70,15);}catch(e){} }
+      pdf.line(margin+132,y,W-margin,y); pdf.text('Customer signature',margin+132,y+4);
+      if(report.customerSignatureData){ try{pdf.addImage(report.customerSignatureData,'PNG',margin+132,y-17,35,15);}catch(e){} }
+
+      // PAGE 3
+      pdf.addPage(); pageHeader(3); y=30;
+      pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.text('Service articles',margin,y); y+=8;
+      const cols=[63,18,15,18,22,10,16];
+      ['Description','Net price','VAT','Gross price','Item no','Qty','Error code'].forEach((h,i)=>{
+        let cx=margin; for(let j=0;j<i;j++) cx+=cols[j];
+        pdf.setFontSize(8); pdf.setFont('helvetica','bold');
+        pdf.text(h, cx+1, y);
+      });
+      y+=10; pdf.setLineWidth(0.3); pdf.line(margin,y-2,W-margin,y-2);
+      pdf.setFont('helvetica','normal');
+      (order.articles||[]).forEach(art=>{
+        if(y>272){pdf.addPage();y=25;}
+        const dl=pdf.splitTextToSize(art.description||'',cols[0]-2);
+        pdf.setFontSize(8); pdf.text(dl,margin+1,y);
+        [art.netPrice,art.vat,art.grossPrice,art.itemNo,art.qty,art.errorCode||''].forEach((v,i)=>{
+          let cx=margin; for(let j=0;j<=i;j++) cx+=cols[j];
+          pdf.text(String(v||''),cx+1,y);
+        });
+        y+=Math.max(6,dl.length*4.5);
+      });
+
+      const blob=pdf.output('blob');
+      const sRef=ref(storage,`reports/${currentOrder.id}/servicerapport_${order.orderNumber}.pdf`);
+      const snap=await uploadBytes(sRef,blob);
+      pdf.save(`servicerapport_${order.orderNumber}.pdf`);
+      return getDownloadURL(snap.ref);
+    } catch(e){ console.error('PDF error:',e); return null; }
+  }
+
+  async function generateAndUploadDisclaimerPDF(report) {
+    try {
+      await loadJsPDF();
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({unit:'mm',format:'a4'});
+      const W=210,margin=20; let y=25;
+      pdf.setFontSize(13); pdf.setFont('helvetica','bold');
+      pdf.text('Møbelmontering – Ansvarsfraskrivelse',margin,y); y+=8;
+      pdf.setFontSize(10);
+      pdf.text('Ved fravalg af vægforankring af produkt med monteringsservice.',margin,y); y+=8;
+      pdf.setFontSize(9.5); pdf.setFont('helvetica','normal');
+      const paras=[
+        'Hos IKEA har sikkerhed højest prioritet, både når der udvikles, samles og monteres produkter. For at møblerne skal være så sikre som muligt at færdes i og omkring, kræver enkelte produkter fastgørelse til væg for at undgå at de vælter og går i stykker eller skader mennesker, dyr og andet.',
+        'Når du bestiller Monteringsservice i IKEA, vil vi gerne have at du skal føle dig tryg ved at produkterne er sikre at anvende, og derfor indebærer det altid at produkter der kræver fastgørelse til væg, også bliver det.',
+        'Montøren har, før opstart af monteringen, informeret dig om, at der i din service indgår et eller flere produkter der kræver fastgørelse i væg.',
+        'Du har ønsket, ikke at lade montørerne udføre denne del af servicen, og det kan derfor medføre at produktet/produkterne vælter og forårsager alvorlig skade på mennesker, dyr og/eller andet. Ydermere vil produkt og servicegaranti frafalde hvis skaden opstår grundet manglende fastgørelse til væg.',
+        'IKEA og/eller montøren kan derfor ikke tage noget ansvar for de skader der kan indtræffe på grund af at produktet ikke er fastgjort i væggen.',
+        'Du har, med fravalget af vægforankring selv ansvaret for eventuelle skader (både direkte og indirekte) som kan opstå som følge af dette fravalg.',
+      ];
+      paras.forEach(p=>{ y+=2; const ls=pdf.splitTextToSize(p,W-margin*2); pdf.text(ls,margin,y); y+=ls.length*5.2; });
+      y+=5;
+      pdf.text(`Monteringsservice er i dag udført ifølge IKEA ordrenr.: ${report.orderNumber||''}`,margin,y); y+=10;
+      const cl=pdf.splitTextToSize('Med din underskrift bekræfter du som kunde hermed at du er indforstået med indholdet i denne ansvarsfraskrivelse.',W-margin*2);
+      pdf.text(cl,margin,y); y+=cl.length*5.5+10;
+      const city=(currentOrder.postalCityState||'').replace(/^\d+\s*/,'');
+      const fld=(lbl,val)=>{ pdf.setFontSize(9.5); pdf.text(`${lbl}:`,margin,y); pdf.setLineWidth(0.4); pdf.line(margin,y+1,W-margin,y+1); if(val) pdf.text(val,margin+1,y); y+=12; };
+      fld('By',city);
+      fld('Dato',new Date().toLocaleDateString('da-DK'));
+      fld('Navn (med blokbogstaver)','');
+      pdf.text('Kunde signatur:',margin,y); pdf.line(margin,y+1,W-margin,y+1);
+      if(report.disclaimerSignatureData){try{pdf.addImage(report.disclaimerSignatureData,'PNG',margin,y-15,80,15);}catch(e){}}
+      y+=20;
+      pdf.text('Montør signatur:',margin,y); pdf.line(margin,y+1,W-margin,y+1);
+      if(report.techSignatureData){try{pdf.addImage(report.techSignatureData,'PNG',margin,y-15,80,15);}catch(e){}}
+      const blob=pdf.output('blob');
+      const sRef=ref(storage,`reports/${currentOrder.id}/ansvarsfraskrivelse_${report.orderNumber}.pdf`);
+      const snap=await uploadBytes(sRef,blob);
+      pdf.save(`ansvarsfraskrivelse_${report.orderNumber}.pdf`);
+      return getDownloadURL(snap.ref);
+    } catch(e){ console.error('Disclaimer PDF error:',e); return null; }
   }
 
   async function uploadDataURL(dataUrl, path) {
@@ -821,7 +1106,9 @@
   window.renderOrderList = renderOrderList;
 
   document.addEventListener('DOMContentLoaded', () => {
+    applyTheme();
     initFirebase();
+    checkIOSInstall();
 
     document.getElementById('loginBtn').addEventListener('click', login);
     document.getElementById('teamPw').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
@@ -1056,6 +1343,80 @@
   .toast-success { border-color: var(--success)50; color: var(--success); }
   .toast-error { border-color: var(--danger)50; color: var(--danger); }
   .toast-info { border-color: var(--accent)50; color: var(--accent); }
+
+  .job-address { font-size:.82rem; color:var(--text2); margin-top:.2rem; }
+
+  /* DOWNLOAD OVERLAY */
+  .download-overlay {
+    position:fixed; inset:0; background:#000000C0; z-index:300;
+    display:flex; align-items:center; justify-content:center; padding:1.5rem;
+  }
+  .download-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:2.5rem 2rem; text-align:center;
+    width:100%; max-width:360px; display:flex; flex-direction:column; gap:.75rem;
+  }
+  .download-card h2 { font-size:1.3rem; }
+  .download-btn {
+    display:block; width:100%; padding:.9rem;
+    background:var(--accent)15; color:var(--accent);
+    border:1px solid var(--accent)40; border-radius:var(--radius);
+    font-size:.9rem; font-weight:600; text-decoration:none;
+    transition:opacity .15s;
+  }
+  .download-btn:hover { opacity:.8; }
+  .download-close {
+    background:none; border:1px solid var(--border);
+    color:var(--text2); border-radius:var(--radius);
+    padding:.7rem; cursor:pointer; font-family:inherit; font-size:.85rem; margin-top:.5rem;
+  }
+
+
+  body.light {
+    --bg: #F2F2F8;
+    --surface: #FFFFFF;
+    --surface2: #EAEAF2;
+    --border: #D8D8E8;
+    --text: #0A0A18;
+    --text2: #666688;
+  }
+  body.light .sig-canvas { border-color: #CCCCDD; }
+  body.light .login-card { box-shadow: 0 20px 60px #00000015; }
+
+  .theme-toggle-btn {
+    background: none; border: none; font-size: 1.1rem;
+    cursor: pointer; padding: .25rem; color: var(--text2);
+    transition: color .15s;
+  }
+  .theme-toggle-btn:hover { color: var(--text); }
+
+  /* SYNC INDICATOR */
+  .sync-pill {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .25rem .6rem; border-radius: 999px;
+    font-size: .7rem; font-weight: 600; transition: all .3s;
+  }
+  .sync-pill.synced { background: var(--success)15; color: var(--success); }
+  .sync-pill.syncing { background: var(--warning)15; color: var(--warning); }
+  .sync-pill.offline { background: var(--danger)15; color: var(--danger); }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .sync-dot.pulse { animation: pulse 1.2s infinite; }
+
+  /* INSTALL BANNER */
+  .install-banner {
+    position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--accent)50;
+    border-radius: 16px; padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: .75rem;
+    box-shadow: 0 8px 32px #00000030; z-index: 400;
+    width: calc(100% - 2rem); max-width: 400px;
+    animation: slideUp .3s ease;
+  }
+  .install-text strong { display: block; font-size: .9rem; }
+  .install-text span { font-size: .78rem; color: var(--text2); }
+  .install-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: .5rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+  .install-x { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1rem; padding: .2rem; flex-shrink: 0; }
+
 </style>
 </head>
 <body>
@@ -1101,4 +1462,3 @@
 
 </body>
 </html>
-
