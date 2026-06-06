@@ -282,7 +282,8 @@
 
   // ── ORDERS ──────────────────────────────────────────────────
   function startOrderListener() {
-    if (!db || !currentTeam) return;
+    if (!currentTeam) return;
+    if (!db) { setTimeout(startOrderListener, 300); return; }
     const q = query(collection(db, 'orders'), where('teamId', '==', currentTeam.id));
     setSyncState('syncing');
     unsubOrders = onSnapshot(q, snap => {
@@ -376,7 +377,7 @@
           ${myOrders.length} ${currentLang==='da'?'opgave(r) tildelt':'task(s) assigned'}
         </p>
       </div>
-      ${groupHTML || `<div class="empty-state"><div style="font-size:3rem">📭</div><p>${t().noOrders}</p></div>`}
+      ${groupHTML || '<div class="empty-state"><div style="font-size:3rem">📭</div><p>' + t().noOrders + '</p></div>'}
     `;
   }
 
@@ -387,7 +388,7 @@
     const canStart = order.status !== 'completed' && order.status !== 'failed';
 
     return `
-      <div class="order-card-team" onclick="${canStart ? `openJob('${order.id}')` : ''}">
+      <div class="order-card-team" onclick="${canStart ? ('openJob(\'' + order.id + '\')') : ''}">
         <div class="order-card-top">
           <div>
             <div class="order-num-team">#${order.orderNumber}</div>
@@ -395,10 +396,10 @@
           </div>
           <div class="status-dot" style="background:${color}20; color:${color}; border:1px solid ${color}40">${statusLabels[order.status] || order.status}</div>
         </div>
-        ${(order.customerAddress1||order.postalCityState) ? `<div class="order-address-team">📍 ${order.customerAddress1 || ''} ${order.postalCityState ? '· '+order.postalCityState : ''}</div>` : ''}
+        ${(order.customerAddress1||order.postalCityState) ? '<div class="order-address-team">📍 ' + (order.customerAddress1||'')+' '+(order.postalCityState?'· '+order.postalCityState:'')+'</div>' : ''}
         <div class="order-actions-team">
-          ${order.pdfUrl ? `<a href="${order.pdfUrl}" target="_blank" class="card-btn btn-pdf" onclick="event.stopPropagation()">📄 PDF</a>` : ''}
-          ${canStart ? `<div class="card-btn btn-start">${order.status === 'inProgress' ? '▶ Fortsæt' : t().startJob} →</div>` : `<div class="card-btn btn-done">✓ ${t().completed}</div>`}
+          ${order.pdfUrl ? '<a href="' + order.pdfUrl + '" target="_blank" class="card-btn btn-pdf" onclick="event.stopPropagation()">📄 PDF</a>' : ''}
+          ${canStart ? '<div class="card-btn btn-start">' + (order.status==='inProgress'?'▶ Fortsæt':t().startJob) + ' →</div>' : '<div class="card-btn btn-done">✓ ' + t().completed + '</div>'}
         </div>
       </div>
     `;
@@ -422,7 +423,7 @@
         <button class="back-btn" onclick="renderOrderList()">← Tilbage</button>
         <div class="job-title">#${currentOrder.orderNumber}</div>
         <div class="job-customer">${currentOrder.customerName || ''}</div>
-        ${currentOrder.customerAddress1 ? `<div class="job-address">📍 ${currentOrder.customerAddress1}${currentOrder.postalCityState ? ', '+currentOrder.postalCityState : ''}</div>` : ''}
+        ${currentOrder.customerAddress1 ? '<div class="job-address">📍 '+currentOrder.customerAddress1+(currentOrder.postalCityState?', '+currentOrder.postalCityState:'')+'</div>' : ''}
       </div>
       <div class="steps-bar">
         <div class="step-item ${jobStep >= 1 ? 'active' : ''}" onclick="gotoStep(1)">
@@ -464,8 +465,8 @@
       <div class="step-body">
         <div class="info-card">
           <h3>📋 ${t().orderNum}: ${currentOrder.orderNumber}</h3>
-          ${currentOrder.customerAddress ? `<p>📍 ${currentOrder.customerAddress}</p>` : ''}
-          ${currentOrder.pdfUrl ? `<a href="${currentOrder.pdfUrl}" target="_blank" class="pdf-link">📄 ${t().viewPDF}</a>` : ''}
+          ${currentOrder.customerAddress ? '<p>📍 ' + currentOrder.customerAddress + '</p>' : ''}
+          ${currentOrder.pdfUrl ? '<a href="'+currentOrder.pdfUrl+'" target="_blank" class="pdf-link">📄 '+t().viewPDF+'</a>' : ''}
         </div>
         
         <div class="section-card">
@@ -480,7 +481,7 @@
         </div>
 
         <button class="primary-btn" onclick="markArrived()" ${currentOrder.status === 'inProgress' ? 'style="background:#3EBE6B"' : ''}>
-          ${currentOrder.status === 'inProgress' ? '✓ Ankomst registreret — Fortsæt →' : `📍 ${t().arrivedBtn}`}
+          ${currentOrder.status === 'inProgress' ? '✓ Ankomst registreret — Fortsæt →' : '📍 ' + t().arrivedBtn}
         </button>
       </div>
     `;
@@ -801,6 +802,7 @@
 
   // ── SUBMIT REPORT ────────────────────────────────────────────
   async function submitReport() {
+    if (!db || !storage) { showToast('Firebase ikke klar - prøv igen', 'error'); return; }
     const status = document.querySelector('input[name="svcStatus"]:checked')?.value;
     if (!status) { showToast('Vælg service status', 'error'); return; }
     const btn = document.getElementById('submitBtn');
@@ -888,8 +890,8 @@
         <div style="font-size:2.5rem">✅</div>
         <h2 style="margin:.5rem 0">Rapport indsendt!</h2>
         <p style="opacity:.6; font-size:.85rem; margin-bottom:1.5rem">PDF genereret og gemt</p>
-        ${reportUrl ? `<a href="${reportUrl}" download="servicerapport_${orderNum}.pdf" class="download-btn" target="_blank">📄 Download Servicerapport</a>` : ''}
-        ${disclaimerUrl ? `<a href="${disclaimerUrl}" download="ansvarsfraskrivelse_${orderNum}.pdf" class="download-btn" style="background:var(--warning)15;color:var(--warning);border-color:var(--warning)40" target="_blank">⚠️ Download Ansvarsfraskrivelse</a>` : ''}
+        ${reportUrl ? '<a href="' + reportUrl + '" download="servicerapport_' + orderNum + '.pdf" class="download-btn" target="_blank">📄 Download Servicerapport</a>' : ''}
+        ${disclaimerUrl ? '<a href="' + disclaimerUrl + '" download="ansvarsfraskrivelse_' + orderNum + '.pdf" class="download-btn" style="background:var(--warning)15;color:var(--warning);border-color:var(--warning)40" target="_blank">⚠️ Download Ansvarsfraskrivelse</a>' : ''}
         <button class="download-close" onclick="this.closest('.download-overlay').remove()">Luk</button>
       </div>`;
     document.body.appendChild(ov);
@@ -1164,13 +1166,15 @@
       document.getElementById('photoOverlay').style.display = 'none';
     };
 
-    // Check saved login
+    // Check saved login - delay to ensure Firebase is ready
     const saved = localStorage.getItem('sl_team');
-    if (saved && db) {
+    if (saved) {
       currentTeam = JSON.parse(saved);
       showApp();
-      startOrderListener();
-      startGPS();
+      setTimeout(() => {
+        startOrderListener();
+        startGPS();
+      }, 500);
     }
   });
 </script>
