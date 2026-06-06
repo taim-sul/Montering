@@ -288,9 +288,11 @@
     unsubOrders = onSnapshot(q, snap => {
       setSyncState('synced');
       myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.serviceDate === tomorrow() || o.serviceDate === today())
-        .sort((a, b) => (a.serviceDate > b.serviceDate ? 1 : -1));
+        .sort((a, b) => (a.serviceDate || '') > (b.serviceDate || '') ? 1 : -1);
       if (currentStep === 'list') renderOrderList();
+    }, err => {
+      setSyncState('offline');
+      showToast('Firebase fejl: ' + err.code, 'error');
     });
   }
 
@@ -321,27 +323,60 @@
   }
 
   // ── ORDER LIST ──────────────────────────────────────────────
+  function isRecentOrder(o) {
+    // Show completed/failed orders from last 7 days
+    const ref = o.completedAt || o.uploadedAt || '';
+    if (!ref) return false;
+    const d = new Date(ref);
+    return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+  }
+
+  function formatServiceDate(order) {
+    const sd = order.serviceDate || '';
+    if (!sd) return t().myOrders;
+    // Handle both YYYY-MM-DD and DD-MM-YYYY
+    let date;
+    if (sd.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      date = new Date(sd);
+    } else if (sd.match(/^\d{2}-\d{2}-\d{4}$/)) {
+      const [d, m, y] = sd.split('-');
+      date = new Date(`${y}-${m}-${d}`);
+    } else {
+      return sd;
+    }
+    return date.toLocaleDateString('da-DK', { weekday:'long', day:'numeric', month:'long' });
+  }
+
   function renderOrderList() {
     currentStep = 'list';
     const main = document.getElementById('mainContent');
-    const todayOrders = myOrders.filter(o => o.serviceDate === today());
-    const tomorrowOrders = myOrders.filter(o => o.serviceDate === tomorrow());
+
+    // Group by serviceDate
+    const groups = {};
+    myOrders.forEach(o => {
+      const key = o.serviceDate || 'ukendt';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(o);
+    });
+
+    const groupKeys = Object.keys(groups).sort();
+    const groupHTML = groupKeys.map(key => {
+      const label = formatServiceDate(groups[key][0]);
+      return `
+        <div class="day-section">
+          <div class="day-label">📅 ${label}</div>
+          ${groups[key].map(o => renderOrderCard(o)).join('')}
+        </div>`;
+    }).join('');
 
     main.innerHTML = `
       <div class="list-header">
         <h1>${t().myOrders}</h1>
+        <p style="color:var(--text2);font-size:.8rem;margin-top:.25rem">
+          ${myOrders.length} ${currentLang==='da'?'opgave(r) tildelt':'task(s) assigned'}
+        </p>
       </div>
-      ${todayOrders.length ? `
-        <div class="day-section">
-          <div class="day-label">📅 ${t().today}</div>
-          ${todayOrders.map(o => renderOrderCard(o)).join('')}
-        </div>` : ''}
-      ${tomorrowOrders.length ? `
-        <div class="day-section">
-          <div class="day-label">📅 ${t().tomorrow}</div>
-          ${tomorrowOrders.map(o => renderOrderCard(o)).join('')}
-        </div>` : ''}
-      ${!myOrders.length ? `<div class="empty-state"><div style="font-size:3rem">📭</div><p>${t().noOrders}</p></div>` : ''}
+      ${groupHTML || `<div class="empty-state"><div style="font-size:3rem">📭</div><p>${t().noOrders}</p></div>`}
     `;
   }
 
@@ -808,21 +843,34 @@
         customerSignatureData: customerSigData,
         disclaimerSignatureData: disclaimerSigData,
       };
-      showToast('Genererer PDF...', 'info');
-      const reportPdfUrl = await generateAndUploadReportPDF(reportData);
-      reportData.reportPdfUrl = reportPdfUrl;
-      let disclaimerPdfUrl = null;
-      if (wallRefuse && disclaimerSigData) {
-        disclaimerPdfUrl = await generateAndUploadDisclaimerPDF(reportData);
-        reportData.disclaimerPdfUrl = disclaimerPdfUrl;
-      }
-      await addDoc(collection(db, 'reports'), reportData);
+      // Save to Firestore FIRST — don't let PDF failure block the report
+      showToast('Gemmer rapport...', 'info');
+      const docRef = await addDoc(collection(db, 'reports'), reportData);
       await updateDoc(doc(db, 'orders', currentOrder.id), {
-        status, completedAt, afterPhotos, jobStep: 3, reportPdfUrl, disclaimerPdfUrl
+        status, completedAt, afterPhotos, jobStep: 3
       });
-      await sendEmailNotification(reportData);
-      showDownloadOptions(reportPdfUrl, disclaimerPdfUrl, reportData.orderNumber);
       showToast(t().reportSubmitted, 'success');
+
+      // Then try email
+      try { await sendEmailNotification(reportData); } catch(e) { console.warn('Email fejl:', e); }
+
+      // Then try PDF generation (non-blocking)
+      showToast('Genererer PDF...', 'info');
+      let reportPdfUrl = null, disclaimerPdfUrl = null;
+      try {
+        reportPdfUrl = await generateAndUploadReportPDF(reportData);
+        if (wallRefuse && disclaimerSigData) {
+          disclaimerPdfUrl = await generateAndUploadDisclaimerPDF(reportData);
+        }
+        // Update Firestore with PDF urls
+        await updateDoc(doc(db, 'orders', currentOrder.id), { reportPdfUrl, disclaimerPdfUrl });
+        await updateDoc(docRef, { reportPdfUrl, disclaimerPdfUrl });
+      } catch(pdfErr) {
+        console.warn('PDF fejl (rapport er stadig gemt):', pdfErr);
+        showToast('Rapport gemt — PDF fejlede', 'error');
+      }
+
+      showDownloadOptions(reportPdfUrl, disclaimerPdfUrl, reportData.orderNumber);
       setTimeout(() => renderOrderList(), 4000);
     } catch(e) {
       console.error(e);
