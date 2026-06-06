@@ -2,17 +2,32 @@
   "name": "Smart Logistics Team",
   "short_name": "SL Team",
   "description": "Smart Logistics Team App",
-  "start_url": "/team.html",
+  "start_url": "/Montering/Team/index.html",
+  "scope": "/Montering/Team/",
   "display": "standalone",
   "background_color": "#0D0D14",
   "theme_color": "#3E8BE8",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "team-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "team-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/Montering/Team/team-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Montering/Team/team-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ],
   "categories": ["business", "productivity"],
   "shortcuts": [
-    { "name": "Mine opgaver", "url": "/team.html", "icons": [{"src": "team-icon-192.png", "sizes": "192x192"}] }
+    {
+      "name": "Mine opgaver",
+      "url": "/Montering/Team/team.html",
+      "icons": [{"src": "/Montering/Team/team-icon-192.png", "sizes": "192x192"}]
+    }
   ]
 }
