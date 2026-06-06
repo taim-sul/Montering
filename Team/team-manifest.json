@@ -5,21 +5,14 @@
   "start_url": "/team.html",
   "display": "standalone",
   "background_color": "#0D0D14",
-  "theme_color": "#0D0D14",
+  "theme_color": "#3E8BE8",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "team-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "team-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    { "name": "Mine opgaver", "url": "/team.html", "icons": [{"src": "team-icon-192.png", "sizes": "192x192"}] }
+  ]
 }
