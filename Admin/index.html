@@ -702,64 +702,289 @@
     const modal = document.getElementById('reportModal');
     const content = document.getElementById('reportModalContent');
 
+        const beforeGrid = (report.beforePhotos||[]).map((url,i) => {
+      const safe = encodeURIComponent(url);
+      return '<img src="' + url + '" onclick="openPhoto(decodeURIComponent(\'' + safe + '\'))" class="thumb" title="Se billede">';
+    }).join('');
+
+    const afterGrid = (report.afterPhotos||[]).map((url,i) => {
+      const safe = encodeURIComponent(url);
+      return '<img src="' + url + '" onclick="openPhoto(decodeURIComponent(\'' + safe + '\'))" class="thumb" title="Se billede">';
+    }).join('');
+
+    ;
+
     content.innerHTML = `
       <div class="modal-header">
-        <h2>${t().reportFor} #${report.orderNumber}</h2>
+        <h2>${t().reportFor} #${report.orderNumber || '—'}</h2>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
+
+      <div class="modal-downloads" id="modalDownloads"></div>
+
       <div class="modal-body">
         <div class="report-detail-grid">
           <div class="detail-section">
             <h3>👤 ${t().customer}</h3>
-            <p>${report.customerName || '—'}</p>
-            <p style="opacity:.6">${report.customerAddress || '—'}</p>
+            <p><strong>${report.customerName || '—'}</strong></p>
+            <p style="opacity:.7;font-size:.82rem">${report.customerAddress1 || report.customerAddress || '—'}</p>
+            <p style="opacity:.7;font-size:.82rem">${report.postalCityState || ''}</p>
           </div>
           <div class="detail-section">
             <h3>📋 ${t().status}</h3>
-            <p class="${report.serviceStatus}">${getStatusLabel(report.serviceStatus)}</p>
-            ${report.failedReason ? `<p style="opacity:.6">${report.failedReason}</p>` : ''}
+            <p style="font-weight:600">${getStatusLabel(report.serviceStatus)}</p>
+            ${(report.failedReasons||[]).length ? '<p style="opacity:.6;font-size:.8rem">'+report.failedReasons.join(', ')+'</p>' : ''}
+            ${(report.incompleteReasons||[]).length ? '<p style="opacity:.6;font-size:.8rem">'+report.incompleteReasons.join(', ')+'</p>' : ''}
           </div>
           <div class="detail-section">
             <h3>⏱ Tid</h3>
             <p>Start: ${report.startTime || '—'}</p>
             <p>Slut: ${report.endTime || '—'}</p>
             <p>Timer: ${report.hoursSpent || '—'}</p>
+            <p>Montører: ${report.numAssemblers || '—'}</p>
           </div>
           <div class="detail-section">
             <h3>👷 Team</h3>
             <p>${report.teamName || '—'}</p>
-            <p>Montører: ${report.numAssemblers || '—'}</p>
+            <p style="opacity:.6;font-size:.8rem">Ordre: #${report.orderNumber || '—'}</p>
+            <p style="opacity:.6;font-size:.8rem">${report.completedAt ? new Date(report.completedAt).toLocaleString('da-DK') : '—'}</p>
           </div>
         </div>
-        ${report.notes ? `<div class="detail-section"><h3>💬 ${t().notes}</h3><p>${report.notes}</p></div>` : ''}
-        ${report.beforePhotos?.length ? `
+
+        ${report.comments ? '<div class="detail-section"><h3>💬 Kommentarer</h3><p>'+report.comments+'</p></div>' : ''}
+
+        ${(report.beforePhotos||[]).length ? `
           <div class="detail-section">
-            <h3>📸 ${t().before}</h3>
-            <div class="photo-grid">${report.beforePhotos.map(url => `<img src="${url}" onclick="openPhoto('${url}')" class="thumb">`).join('')}</div>
+            <h3>📸 Før arbejdet (${(report.beforePhotos||[]).length} billeder)</h3>
+            <div class="photo-grid">${beforeGrid}</div>
           </div>` : ''}
-        ${report.afterPhotos?.length ? `
+
+        ${(report.afterPhotos||[]).length ? `
           <div class="detail-section">
-            <h3>📸 ${t().after}</h3>
-            <div class="photo-grid">${report.afterPhotos.map(url => `<img src="${url}" onclick="openPhoto('${url}')" class="thumb">`).join('')}</div>
+            <h3>📸 Efter arbejdet (${(report.afterPhotos||[]).length} billeder)</h3>
+            <div class="photo-grid">${afterGrid}</div>
           </div>` : ''}
+
         ${report.techSignature ? `
           <div class="detail-section">
             <h3>✍️ Montør underskrift</h3>
             <img src="${report.techSignature}" class="sig-preview">
+            <a href="${report.techSignature}" download="montoe_underskrift_${report.orderNumber}.png" class="dl-link">⬇ Download</a>
           </div>` : ''}
+
         ${report.customerSignature ? `
           <div class="detail-section">
             <h3>✍️ Kunde underskrift</h3>
             <img src="${report.customerSignature}" class="sig-preview">
+            <a href="${report.customerSignature}" download="kunde_underskrift_${report.orderNumber}.png" class="dl-link">⬇ Download</a>
           </div>` : ''}
+
         ${report.disclaimerSignature ? `
           <div class="detail-section disclaimer-section">
             <h3>⚠️ Ansvarsfraskrivelse underskrevet</h3>
             <img src="${report.disclaimerSignature}" class="sig-preview">
+            <a href="${report.disclaimerSignature}" download="ansvarsfraskrivelse_underskrift_${report.orderNumber}.png" class="dl-link">⬇ Download</a>
           </div>` : ''}
+
+        ${report.wallMountRefused ? '<div class="detail-section" style="border-color:var(--warning)40;background:var(--warning)05"><h3>⚠️ Vægmontering afvist</h3><p style="font-size:.85rem;opacity:.7">Kunden afslog fastgørelse til væg</p></div>' : ''}
       </div>
     `;
     modal.style.display = 'flex';
+
+    // Build downloads section separately to avoid template literal issues
+    const dlDiv = document.getElementById('modalDownloads');
+    if (dlDiv) {
+      if (report.reportPdfUrl) {
+        const a = document.createElement('a');
+        a.href = report.reportPdfUrl; a.target = '_blank'; a.download = '';
+        a.className = 'dl-btn dl-report'; a.textContent = '📄 Download Servicerapport';
+        dlDiv.appendChild(a);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'dl-btn dl-report';
+        btn.textContent = '📄 Generer Servicerapport PDF';
+        btn.onclick = () => generateAdminReportPDF(reportId);
+        dlDiv.appendChild(btn);
+      }
+      if (report.disclaimerPdfUrl) {
+        const a = document.createElement('a');
+        a.href = report.disclaimerPdfUrl; a.target = '_blank'; a.download = '';
+        a.className = 'dl-btn dl-disclaimer'; a.textContent = '⚠️ Download Ansvarsfraskrivelse';
+        dlDiv.appendChild(a);
+      }
+      const photoBtn = document.createElement('button');
+      photoBtn.className = 'dl-btn dl-photos';
+      photoBtn.textContent = '🖼️ Download billeder';
+      photoBtn.onclick = () => downloadAllPhotos(reportId);
+      dlDiv.appendChild(photoBtn);
+    }
+  }
+
+  async function downloadAllPhotos(reportId) {
+    const report = reportsData.find(r => r.id === reportId);
+    if (!report) return;
+    const all = [...(report.beforePhotos||[]), ...(report.afterPhotos||[])];
+    if (!all.length) { showToast('Ingen billeder på denne rapport', 'info'); return; }
+    showToast('Downloader ' + all.length + ' billeder...', 'info');
+    for (let i = 0; i < all.length; i++) {
+      const url = all[i];
+      const type = i < (report.beforePhotos||[]).length ? 'foer' : 'efter';
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank';
+      a.download = type + '_' + (report.orderNumber||'rapport') + '_' + (i+1) + '.jpg';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 400));
+    }
+    showToast('Billeder downloadet', 'success');
+  }
+  window.downloadAllPhotos = downloadAllPhotos;
+
+  async function generateAdminReportPDF(reportId) {
+    const report = reportsData.find(r => r.id === reportId);
+    if (!report) return;
+    showToast('Genererer PDF...', 'info');
+    try {
+      await loadJsPDFAdmin();
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:'mm', format:'a4' });
+      const W=210, margin=20;
+      let y = 25;
+
+      const pageHeader = (n, total) => {
+        pdf.setFontSize(18); pdf.setFont('helvetica','bold');
+        pdf.text('Service Report', W/2, 18, {align:'center'});
+        pdf.setFontSize(11); pdf.setFont('helvetica','normal');
+        pdf.text(n+'/'+total, W-margin, 18, {align:'right'});
+        pdf.setLineWidth(0.3); pdf.line(margin,21,W-margin,21);
+      };
+
+      const addF = (lbl, val, lw=65) => {
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+        pdf.text(lbl, margin, y);
+        pdf.setLineWidth(0.2); pdf.line(margin+lw, y+0.5, W-margin, y+0.5);
+        if(val) pdf.text(String(val).substring(0,60), margin+lw+1, y);
+        y+=7;
+      };
+
+      // PAGE 1
+      pageHeader(1,3); y=30;
+      addF('Print date', new Date().toLocaleDateString('da-DK'));
+      addF('Customer name', report.customerName||'');
+      addF('Customer address 1', report.customerAddress1||'');
+      addF('Customer address 2', '');
+      addF('Customer address 3', '');
+      addF('Postal code/city/state', report.postalCityState||'');
+      addF('Primary phone', '');
+      addF('Secondary phone', '');
+      addF('Mobile phone', '');
+      addF('Email', '');
+      addF('Service provider', report.serviceProvider||'Bring E-Commerce & Logistics A/S');
+      addF('Service product', 'Assembly');
+      addF('Originating store', report.originatingStore||'');
+      addF('Order number', report.orderNumber||'');
+      addF('Delivery order number', '');
+      addF('Order attachment exists', 'No');
+
+      // PAGE 2
+      pdf.addPage(); pageHeader(2,3); y=30;
+      const addF2 = (lbl,val) => {
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.text(lbl,margin,y);
+        pdf.setLineWidth(0.2); pdf.line(margin+87,y+0.5,W-margin,y+0.5);
+        if(val) pdf.text(String(val),margin+88,y); y+=7;
+      };
+      pdf.setFontSize(9); pdf.text('Filled in by service provider',margin,y); y+=7;
+      addF2('Service actual start date/time', report.startTime||'');
+      addF2('Service actual end date/time', report.endTime||'');
+      pdf.text('Additional services needed?',margin,y);
+      pdfCheckbox(pdf,margin+90,y-3,report.additionalServices,'Yes');
+      pdfCheckbox(pdf,margin+112,y-3,!report.additionalServices,'No'); y+=7;
+      pdf.text('Hours to complete service',margin,y);
+      pdf.line(margin+87,y+0.5,margin+117,y+0.5);
+      if(report.hoursSpent) pdf.text(String(report.hoursSpent),margin+88,y);
+      pdf.text('hours',margin+120,y); y+=7;
+      addF2('Who performed the service?(team/name)', report.teamName||'');
+      addF2('Number of assemblers', report.numAssemblers||'');
+      pdf.text('SP have been in contact with IKEA?',margin,y);
+      pdfCheckbox(pdf,margin+90,y-3,report.contactedIkea,'Yes');
+      pdfCheckbox(pdf,margin+112,y-3,!report.contactedIkea,'No'); y+=7;
+      addF2('Customer service reference id', report.ikeaRef||'');
+      y+=5;
+      pdfCheckbox(pdf,margin,y-3,report.serviceStatus==='completed','Service completed'); y+=7;
+      pdfCheckbox(pdf,margin,y-3,report.serviceStatus==='failed','Service failed'); y+=7;
+      pdfCheckbox(pdf,margin,y-3,report.serviceStatus==='incomplete','Service incomplete'); y+=10;
+      pdf.setFontSize(9); pdf.text('Select failed reason code',margin,y); y+=6;
+      [['Customer not home','customerNotHome'],['No/Not enough capacity','noCapacity'],['Payment problems','paymentProblems']]
+        .forEach(([l,k],i) => pdfCheckbox(pdf,margin,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
+      [['Articles missing','articlesMissing'],['Inappropriate service conditions','inappropriateConditions']]
+        .forEach(([l,k],i) => pdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
+      y+=26;
+      pdf.text('Select incomplete reason code',margin,y); y+=6;
+      [['Articles missing','articlesMissing'],['Damaged articles','damagedArticles'],['Sales error','salesError'],['Installation error','installError']]
+        .forEach(([l,k],i) => pdfCheckbox(pdf,margin,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
+      [['Incorrect articles','incorrectArticles'],['Pre measurements not correct','preNotCorrect'],['Payment problems','paymentProblems'],['Changed mind','changedMind']]
+        .forEach(([l,k],i) => pdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
+      y+=36;
+      pdf.text('Comments',margin,y); y+=5;
+      if(report.comments){const ls=pdf.splitTextToSize(report.comments,W-margin*2);pdf.text(ls,margin,y);y+=ls.length*5;}
+      for(let i=0;i<4;i++){y+=6;pdf.line(margin,y,W-margin,y);}
+      y+=7;
+      const sl=pdf.splitTextToSize('The service was without any complaints and performed to the satisfaction of the customer',100);
+      pdf.text(sl,margin,y);
+      pdfCheckbox(pdf,margin+115,y-3,report.satisfaction,'Yes');
+      pdfCheckbox(pdf,margin+135,y-3,!report.satisfaction,'No');
+      y=265;
+      pdf.line(margin,y,margin+35,y); pdf.setFontSize(8); pdf.text('Date',margin,y+4);
+      pdf.text(report.completedAt?new Date(report.completedAt).toLocaleDateString('da-DK'):'',margin+1,y-1);
+      pdf.line(margin+42,y,margin+125,y); pdf.text('Service provider signature',margin+42,y+4);
+      if(report.techSignature){try{pdf.addImage(report.techSignature,'PNG',margin+42,y-17,70,15);}catch(e){}}
+      pdf.line(margin+132,y,W-margin,y); pdf.text('Customer signature',margin+132,y+4);
+      if(report.customerSignature){try{pdf.addImage(report.customerSignature,'PNG',margin+132,y-17,35,15);}catch(e){}}
+
+      // PAGE 3
+      pdf.addPage(); pageHeader(3,3); y=30;
+      pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.text('Service articles',margin,y); y+=8;
+      const cols=[63,18,15,18,22,10,16];
+      ['Description','Net price','VAT','Gross price','Item no','Qty','Error code'].forEach((h,i)=>{
+        let cx=margin; for(let j=0;j<i;j++) cx+=cols[j];
+        pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.text(h,cx+1,y);
+      });
+      y+=10; pdf.setLineWidth(0.3); pdf.line(margin,y-2,W-margin,y-2);
+      pdf.setFont('helvetica','normal');
+      (report.articles||[]).forEach(art=>{
+        if(y>272){pdf.addPage();y=25;}
+        const dl=pdf.splitTextToSize(art.description||'',cols[0]-2);
+        pdf.setFontSize(8); pdf.text(dl,margin+1,y);
+        [art.netPrice,art.vat,art.grossPrice,art.itemNo,art.qty,art.errorCode||''].forEach((v,i)=>{
+          let cx=margin; for(let j=0;j<=i;j++) cx+=cols[j];
+          pdf.text(String(v||''),cx+1,y);
+        });
+        y+=Math.max(6,dl.length*4.5);
+      });
+
+      pdf.save('servicerapport_'+report.orderNumber+'.pdf');
+      showToast('PDF downloadet!', 'success');
+    } catch(e) {
+      console.error(e);
+      showToast('PDF fejl: ' + e.message, 'error');
+    }
+  }
+  window.generateAdminReportPDF = generateAdminReportPDF;
+
+  function pdfCheckbox(pdf, x, y, checked, label) {
+    pdf.setLineWidth(0.4); pdf.rect(x,y,3.5,3.5);
+    if(checked){pdf.line(x,y,x+3.5,y+3.5);pdf.line(x+3.5,y,x,y+3.5);}
+    pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.text(label,x+5,y+3);
+  }
+
+  async function loadJsPDFAdmin() {
+    if (window.jspdf) return;
+    await new Promise((res,rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
   }
 
   function closeModal() {
@@ -767,6 +992,7 @@
   }
 
   function openPhoto(url) {
+    try { url = decodeURIComponent(url); } catch(e) {}
     const overlay = document.getElementById('photoOverlay');
     document.getElementById('fullPhoto').src = url;
     overlay.style.display = 'flex';
@@ -1349,6 +1575,29 @@
     color:var(--text); font-family:inherit; font-size:.85rem; cursor:pointer;
   }
   .filter-select:focus { outline:none; border-color:var(--accent); }
+
+
+  /* MODAL DOWNLOAD BUTTONS */
+  .modal-downloads {
+    display: flex; gap: .75rem; flex-wrap: wrap;
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .dl-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .6rem 1rem; border-radius: 8px; font-size: .82rem;
+    font-weight: 600; cursor: pointer; text-decoration: none;
+    border: none; font-family: inherit; transition: opacity .15s;
+  }
+  .dl-btn:hover { opacity: .8; }
+  .dl-report { background: var(--accent2)15; color: var(--accent2); border: 1px solid var(--accent2)40; }
+  .dl-disclaimer { background: var(--warning)15; color: var(--warning); border: 1px solid var(--warning)40; }
+  .dl-photos { background: var(--success)15; color: var(--success); border: 1px solid var(--success)40; }
+  .dl-link {
+    display: inline-block; margin-top: .4rem; font-size: .75rem;
+    color: var(--accent2); text-decoration: none;
+  }
+  .dl-link:hover { text-decoration: underline; }
 
 </style>
 </head>
