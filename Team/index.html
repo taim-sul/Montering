@@ -2,22 +2,23 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="SL Team">
-<meta name="theme-color" content="#0D0D14">
-<title>Smart Logistics — Team</title>
-<!-- Build: 2026-06-07 06:46 -->
-<link rel="manifest" href="/Montering/Team/team-manifest.json">
-<link rel="apple-touch-icon" href="/Montering/Team/team-icon-192.png">
+<meta name="apple-mobile-web-app-title" content="SL Admin">
+<meta name="theme-color" content="#0A0A0F">
+<title>Smart Logistics — Admin</title>
+<link rel="manifest" href="/Montering/Admin/admin-manifest.json">
+<link rel="apple-touch-icon" href="/Montering/Admin/admin-icon-192.png">
 
+<!-- Firebase -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-  import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
   import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
-  // ── CONFIG ──────────────────────────────────────────────
+  // ── CONFIG ──────────────────────────────────────────────────
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyDl3LaBoekT87gecZpKPmLpFBdN-uRU3jc",
     authDomain: "smart-logsiti.firebaseapp.com",
@@ -28,1464 +29,1326 @@
   };
 
   const ADMIN_EMAIL = "taim@smartlogistics.dk";
+  const ADMIN_PASSWORD = "admin123"; // Change this!
 
   const TEAMS = [
-    { id: "team1", name: "Team 1", password: "team1pass", color: "#E86B3E" },
-    { id: "team2", name: "Team 2", password: "team2pass", color: "#3E8BE8" },
-    { id: "team3", name: "Team 3", password: "team3pass", color: "#3EBE6B" },
-    { id: "team4", name: "Team 4", password: "team4pass", color: "#BE3E8B" },
-    { id: "team5", name: "Team 5", password: "team5pass", color: "#8BBE3E" },
+    { id: "team1", name: "Team 1", color: "#E86B3E" },
+    { id: "team2", name: "Team 2", color: "#3E8BE8" },
+    { id: "team3", name: "Team 3", color: "#3EBE6B" },
+    { id: "team4", name: "Team 4", color: "#BE3E8B" },
+    { id: "team5", name: "Team 5", color: "#8BBE3E" },
   ];
 
   const LANG = {
     da: {
-      login: "Log ind", logout: "Log ud", team: "Team", password: "Adgangskode",
-      myOrders: "Mine opgaver", tomorrow: "I morgen", today: "I dag",
-      noOrders: "Ingen opgaver tildelt", orderNum: "Ordrenr.",
-      customer: "Kunde", address: "Adresse", articles: "Artikler",
-      startJob: "Start job", arrivedBtn: "Jeg er ankommet",
-      takeBeforePhotos: "Tag FØR-billeder", takeAfterPhotos: "Tag EFTER-billeder",
-      fillReport: "Udfyld servicerapport", submitReport: "Indsend rapport",
-      serviceCompleted: "Service udført", serviceFailed: "Service fejlet",
-      serviceIncomplete: "Service ufuldstændig", failReason: "Årsag til fejl",
-      incompleteReason: "Årsag til ufuldstændig",
-      customerNotHome: "Kunde ikke hjemme", articlesMissing: "Manglende artikler",
-      noCapacity: "Ingen/utilstrækkelig kapacitet",
-      inappropriateConditions: "Upassende serviceforhold",
-      paymentProblems: "Betalingsproblemer", incorrectArticles: "Forkerte artikler",
-      damagedArticles: "Beskadigede artikler", preNotCorrect: "Formålinger forkerte",
-      salesError: "Salg-fejl", installError: "Monteringsfejl",
-      changedMind: "Ombestemt sig", comments: "Kommentarer",
-      techSignature: "Montør underskrift", customerSignature: "Kunde underskrift",
-      disclaimerTitle: "Ansvarsfraskrivelse", disclaimerText: "Kunden ønsker ikke at skabene fastgøres til væggen og fraskriver sig hermed ethvert ansvar for skader, personskader eller tab som følge af manglende vægmontering.",
-      disclaimerSign: "Kunden accepterer og underskriver",
-      wallMount: "Kunden vil ikke have skabe fastgjort til væg?",
-      yes: "Ja", no: "Nej", save: "Gem", submit: "Indsend",
-      photosBefore: "Billeder FØR arbejdet", photosAfter: "Billeder EFTER arbejdet",
-      addPhoto: "Tilføj billede", photoSaved: "Billede gemt",
-      reportSent: "Rapport sendt!", saving: "Gemmer...",
-      startTime: "Starttid", endTime: "Sluttid",
-      hours: "Timer brugt", assemblers: "Antal montører",
-      additionalServices: "Yderligere services påkrævet?",
-      contactedIkea: "Kontaktet IKEA?", ikeaRef: "IKEA reference nr.",
-      satisfactionYes: "Udført til kundens tilfredshed",
-      language: "Sprog", viewPDF: "Se PDF",
-      status: "Status", pending: "Afventer", inProgress: "I gang",
-      completed: "Færdig", failed: "Fejlet",
-      arrivedConfirm: "Ankomst registreret!", reportSubmitted: "Rapport indsendt!",
-      signHere: "Underskriv her", clearSig: "Ryd",
-      step1: "Ankomst & Før-billeder", step2: "Arbejde", step3: "Rapport",
+      login: "Log ind", logout: "Log ud", password: "Adgangskode",
+      upload: "Upload ordrer", orders: "Ordrer", teams: "Teams",
+      reports: "Rapporter", map: "Kort", today: "I dag", tomorrow: "I morgen",
+      orderNum: "Ordrenr.", customer: "Kunde", team: "Team", status: "Status",
+      assign: "Tildel team", delete: "Slet", noOrders: "Ingen ordrer",
+      uploaded: "Uploadet", pending: "Afventer", inProgress: "I gang",
+      completed: "Færdig", failed: "Fejlet", selectTeam: "Vælg team",
+      uploadPDF: "Upload PDF-filer", dragDrop: "Træk og slip PDF'er her",
+      orClick: "eller klik for at vælge", processing: "Behandler...",
+      success: "Succes!", assignDate: "Dato for service",
+      viewReport: "Se rapport", location: "Lokation", lastSeen: "Sidst set",
+      reportFor: "Rapport for", photos: "Billeder", before: "Før",
+      after: "Efter", signature: "Underskrift", notes: "Noter",
+      adminLogin: "Administrator Login", welcomeBack: "Velkommen tilbage",
+      dashboard: "Dashboard", totalOrders: "Ordrer i alt",
+      activeTeams: "Aktive teams", completedToday: "Færdige i dag",
+      pendingOrders: "Afventende", language: "Sprog",
     },
     en: {
-      login: "Login", logout: "Log out", team: "Team", password: "Password",
-      myOrders: "My tasks", tomorrow: "Tomorrow", today: "Today",
-      noOrders: "No tasks assigned", orderNum: "Order no.",
-      customer: "Customer", address: "Address", articles: "Articles",
-      startJob: "Start job", arrivedBtn: "I have arrived",
-      takeBeforePhotos: "Take BEFORE photos", takeAfterPhotos: "Take AFTER photos",
-      fillReport: "Fill service report", submitReport: "Submit report",
-      serviceCompleted: "Service completed", serviceFailed: "Service failed",
-      serviceIncomplete: "Service incomplete", failReason: "Reason for failure",
-      incompleteReason: "Reason for incomplete",
-      customerNotHome: "Customer not home", articlesMissing: "Articles missing",
-      noCapacity: "No/not enough capacity",
-      inappropriateConditions: "Inappropriate service conditions",
-      paymentProblems: "Payment problems", incorrectArticles: "Incorrect articles",
-      damagedArticles: "Damaged articles", preNotCorrect: "Pre-measurements incorrect",
-      salesError: "Sales error", installError: "Installation error",
-      changedMind: "Changed mind", comments: "Comments",
-      techSignature: "Technician signature", customerSignature: "Customer signature",
-      disclaimerTitle: "Disclaimer / Ansvarsfraskrivelse",
-      disclaimerText: "The customer does not wish the cabinets to be wall-mounted and hereby disclaims all responsibility for damage, injury or loss resulting from the lack of wall mounting.",
-      disclaimerSign: "Customer accepts and signs",
-      wallMount: "Customer refuses wall mounting?",
-      yes: "Yes", no: "No", save: "Save", submit: "Submit",
-      photosBefore: "Photos BEFORE work", photosAfter: "Photos AFTER work",
-      addPhoto: "Add photo", photoSaved: "Photo saved",
-      reportSent: "Report sent!", saving: "Saving...",
-      startTime: "Start time", endTime: "End time",
-      hours: "Hours spent", assemblers: "Number of assemblers",
-      additionalServices: "Additional services required?",
-      contactedIkea: "Contacted IKEA?", ikeaRef: "IKEA reference no.",
-      satisfactionYes: "Completed to customer satisfaction",
-      language: "Language", viewPDF: "View PDF",
-      status: "Status", pending: "Pending", inProgress: "In progress",
-      completed: "Completed", failed: "Failed",
-      arrivedConfirm: "Arrival registered!", reportSubmitted: "Report submitted!",
-      signHere: "Sign here", clearSig: "Clear",
-      step1: "Arrival & Before photos", step2: "Work", step3: "Report",
+      login: "Login", logout: "Log out", password: "Password",
+      upload: "Upload orders", orders: "Orders", teams: "Teams",
+      reports: "Reports", map: "Map", today: "Today", tomorrow: "Tomorrow",
+      orderNum: "Order no.", customer: "Customer", team: "Team", status: "Status",
+      assign: "Assign team", delete: "Delete", noOrders: "No orders",
+      uploaded: "Uploaded", pending: "Pending", inProgress: "In progress",
+      completed: "Completed", failed: "Failed", selectTeam: "Select team",
+      uploadPDF: "Upload PDF files", dragDrop: "Drag and drop PDFs here",
+      orClick: "or click to select", processing: "Processing...",
+      success: "Success!", assignDate: "Service date",
+      viewReport: "View report", location: "Location", lastSeen: "Last seen",
+      reportFor: "Report for", photos: "Photos", before: "Before",
+      after: "After", signature: "Signature", notes: "Notes",
+      adminLogin: "Administrator Login", welcomeBack: "Welcome back",
+      dashboard: "Dashboard", totalOrders: "Total orders",
+      activeTeams: "Active teams", completedToday: "Completed today",
+      pendingOrders: "Pending orders", language: "Language",
     }
   };
 
-  let app, db, storage;
+  let app, auth, db, storage;
   let currentLang = localStorage.getItem('sl_lang') || 'da';
-  let currentTeam = null;
-  let myOrders = [];
-  let currentOrder = null;
-  let currentStep = 'list'; // list | job
-  let jobStep = 1; // 1=arrival+before, 2=work, 3=report
-  let beforePhotos = [];
-  let afterPhotos = [];
-  let techSigData = null;
-  let customerSigData = null;
-  let disclaimerSigData = null;
-  let sigCanvas = null, sigCtx = null, sigDrawing = false;
-  let activeSigTarget = null;
-  let gpsWatcher = null;
-  let unsubOrders = null;
+  let currentView = 'orders';
+  let ordersData = [];
+  let reportsData = [];
+  let teamLocations = {};
+  let isLoggedIn = false;
+  let unsubscribeOrders = null;
+  let unsubscribeReports = null;
+  let unsubscribeLocations = null;
 
   const t = () => LANG[currentLang];
-  const tomorrow = () => { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().split('T')[0]; };
-  const today = () => new Date().toISOString().split('T')[0];
 
 
   // ── THEME ────────────────────────────────────────────────────
   let currentTheme = localStorage.getItem('sl_theme') || 'dark';
-  function applyTheme() { document.body.classList.toggle('light', currentTheme === 'light'); }
+  function applyTheme() {
+    document.body.classList.toggle('light', currentTheme === 'light');
+  }
   function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('sl_theme', currentTheme);
     applyTheme();
-    if (currentTeam) renderHeader();
+    renderNav();
   }
   window.toggleTheme = toggleTheme;
 
-  // ── SYNC ─────────────────────────────────────────────────────
-  let syncState = 'syncing';
+  // ── SYNC INDICATOR ───────────────────────────────────────────
+  let syncState = 'syncing'; // syncing | synced | offline
   function setSyncState(state) {
     syncState = state;
-    const el = document.getElementById('syncPill');
+    const el = document.getElementById('syncIndicator');
     if (!el) return;
-    const labels = { synced: 'Synk', syncing: '...', offline: 'Offline' };
-    el.className = `sync-pill ${state}`;
+    const labels = { synced: currentLang==='da'?'Synkroniseret':'Synced', syncing: currentLang==='da'?'Synkroniserer...':'Syncing...', offline: currentLang==='da'?'Offline':'Offline' };
+    el.className = `sync-bar ${state}`;
     el.innerHTML = `<div class="sync-dot ${state==='syncing'?'pulse':''}"></div>${labels[state]}`;
   }
   window.addEventListener('online', () => setSyncState('synced'));
   window.addEventListener('offline', () => setSyncState('offline'));
 
   // ── INSTALL PROMPT ───────────────────────────────────────────
-  let deferredPrompt = null;
+  let deferredInstallPrompt = null;
   window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault(); deferredPrompt = e;
+    e.preventDefault();
+    deferredInstallPrompt = e;
     if (!localStorage.getItem('sl_install_dismissed')) showInstallBanner();
   });
   function showInstallBanner() {
     if (document.getElementById('installBanner')) return;
-    const b = document.createElement('div');
-    b.id = 'installBanner'; b.className = 'install-banner';
-    b.innerHTML = `
-      <span style="font-size:1.8rem">📱</span>
-      <div class="install-text flex:1">
-        <strong>Installer app</strong>
-        <span>Tilføj til startskærm for hurtig adgang</span>
+    const banner = document.createElement('div');
+    banner.id = 'installBanner';
+    banner.className = 'install-banner';
+    banner.innerHTML = `
+      <span style="font-size:2rem">📱</span>
+      <div class="install-banner-text">
+        <strong>${currentLang==='da'?'Installer som app':'Install as app'}</strong>
+        <span>${currentLang==='da'?'Få hurtig adgang fra din startskærm':'Get quick access from your home screen'}</span>
       </div>
-      <button class="install-btn" onclick="doInstall()">Installer</button>
-      <button class="install-x" onclick="dismissInstall()">✕</button>
+      <button class="install-btn" onclick="triggerInstall()">Installer</button>
+      <button class="install-dismiss" onclick="dismissInstall()">✕</button>
     `;
-    document.body.appendChild(b);
+    document.body.appendChild(banner);
   }
-  async function doInstall() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
+  async function triggerInstall() {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const result = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
     document.getElementById('installBanner')?.remove();
   }
   function dismissInstall() {
-    localStorage.setItem('sl_install_dismissed','1');
+    localStorage.setItem('sl_install_dismissed', '1');
     document.getElementById('installBanner')?.remove();
   }
-
-  function checkIOSInstall() {
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.navigator.standalone;
-    const dismissed = localStorage.getItem('sl_ios_dismissed');
-    if (isIOS && !isStandalone && !dismissed) {
-      setTimeout(showIOSBanner, 2000);
-    }
-  }
-  function showIOSBanner() {
-    if (document.getElementById('iosBanner')) return;
-    const b = document.createElement('div');
-    b.id = 'iosBanner'; b.className = 'install-banner';
-    b.style.bottom = '1.5rem';
-    b.innerHTML = `
-      <span style="font-size:1.8rem">📱</span>
-      <div style="flex:1">
-        <strong style="display:block;font-size:.9rem">Installer på iPhone</strong>
-        <span style="font-size:.78rem;color:var(--text2)">Tryk <b>Del</b> ↑ → <b>Føj til hjemmeskærm</b></span>
-      </div>
-      <button class="install-x" onclick="document.getElementById('iosBanner').remove(); localStorage.setItem('sl_ios_dismissed','1')">✕</button>
-    `;
-    document.body.appendChild(b);
-  }
-  window.doInstall = doInstall;
+  window.triggerInstall = triggerInstall;
   window.dismissInstall = dismissInstall;
 
   function initFirebase() {
     try {
       app = initializeApp(FIREBASE_CONFIG);
+      auth = getAuth(app);
       db = getFirestore(app);
       storage = getStorage(app);
+      setupAuthListener();
     } catch(e) {
-      showToast('Firebase ikke konfigureret', 'error');
+      showToast('Firebase ikke konfigureret. Se firebase-config.js', 'error');
+      console.error(e);
     }
   }
 
-  // ── AUTH ────────────────────────────────────────────────────
-  function login() {
-    const teamSel = document.getElementById('teamSelect').value;
-    const pw = document.getElementById('teamPw').value;
-    const team = TEAMS.find(t => t.id === teamSel);
-    if (!team) { showToast('Vælg et team', 'error'); return; }
-    if (pw !== team.password) { showToast('Forkert adgangskode', 'error'); return; }
-    currentTeam = team;
-    localStorage.setItem('sl_team', JSON.stringify(team));
-    showApp();
-    startOrderListener();
-    startGPS();
+  function setupAuthListener() {
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        isLoggedIn = true;
+        showApp();
+        startListeners();
+      } else {
+        isLoggedIn = false;
+        showLogin();
+      }
+    });
   }
 
-  function logout() {
-    if (unsubOrders) unsubOrders();
-    if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
-    currentTeam = null;
-    localStorage.removeItem('sl_team');
-    currentOrder = null;
-    currentStep = 'list';
+  async function login() {
+    const pw = document.getElementById('loginPw').value;
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pw);
+    } catch(e) {
+      showToast('Forkert adgangskode', 'error');
+      btn.disabled = false;
+      btn.textContent = t().login;
+    }
+  }
+
+  async function logout() {
+    if (unsubscribeOrders) unsubscribeOrders();
+    if (unsubscribeReports) unsubscribeReports();
+    if (unsubscribeLocations) unsubscribeLocations();
+    await signOut(auth);
+  }
+
+  function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
   }
 
-  function tryAutoLogin() {
-    const saved = localStorage.getItem('sl_team');
-    if (saved) {
-      currentTeam = JSON.parse(saved);
-      showApp();
-      startOrderListener();
-      startGPS();
-    }
-  }
-
-  // ── GPS ─────────────────────────────────────────────────────
-  function startGPS() {
-    if (!navigator.geolocation) return;
-    gpsWatcher = navigator.geolocation.watchPosition(pos => {
-      if (!currentTeam || !db) return;
-      setDoc(doc(db, 'locations', currentTeam.id), {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        timestamp: new Date().toISOString(),
-        teamName: currentTeam.name
-      }).catch(() => {});
-    }, null, { enableHighAccuracy: true, maximumAge: 30000 });
-  }
-
-  // ── ORDERS ──────────────────────────────────────────────────
-  function startOrderListener() {
-    if (!currentTeam) return;
-    if (!db) { setTimeout(startOrderListener, 300); return; }
-    const q = query(collection(db, 'orders'), where('teamId', '==', currentTeam.id));
-    setSyncState('syncing');
-    unsubOrders = onSnapshot(q, snap => {
-      setSyncState('synced');
-      myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.serviceDate || '') > (b.serviceDate || '') ? 1 : -1);
-      if (currentStep === 'list') renderOrderList();
-    }, err => {
-      setSyncState('offline');
-      showToast('Firebase fejl: ' + err.code, 'error');
-    });
-  }
-
-  // ── SHOW APP ────────────────────────────────────────────────
   function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'flex';
-    renderHeader();
-    renderOrderList();
+    renderNav();
+    navigateTo('orders');
   }
 
-  function renderHeader() {
-    document.getElementById('appHeader').innerHTML = `
-      <div class="header-brand">
-        <span style="font-size:1.2rem">⚡</span>
-        <span class="header-title">Smart Logistics</span>
-      </div>
-      <div class="header-right">
-        <div id="syncPill" class="sync-pill syncing"><div class="sync-dot pulse"></div>...</div>
-        <div class="team-pill" style="background:${currentTeam.color}20; color:${currentTeam.color}; border:1px solid ${currentTeam.color}40">
-          ● ${currentTeam.name}
-        </div>
-        <button class="theme-toggle-btn" onclick="toggleTheme()" title="Tema">${currentTheme==='dark'?'☀️':'🌙'}</button>
-        <button class="icon-btn" onclick="toggleLang()" title="Sprog">🌐</button>
-        <button class="icon-btn" onclick="logout()" title="Log ud">↩</button>
-      </div>
-    `;
-  }
-
-  // ── ORDER LIST ──────────────────────────────────────────────
-  function isRecentOrder(o) {
-    // Show completed/failed orders from last 7 days
-    const ref = o.completedAt || o.uploadedAt || '';
-    if (!ref) return false;
-    const d = new Date(ref);
-    return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
-  }
-
-  function formatServiceDate(order) {
-    const sd = order.serviceDate || '';
-    if (!sd) return t().myOrders;
-    // Handle both YYYY-MM-DD and DD-MM-YYYY
-    let date;
-    if (sd.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      date = new Date(sd);
-    } else if (sd.match(/^\d{2}-\d{2}-\d{4}$/)) {
-      const [d, m, y] = sd.split('-');
-      date = new Date(`${y}-${m}-${d}`);
-    } else {
-      return sd;
-    }
-    return date.toLocaleDateString('da-DK', { weekday:'long', day:'numeric', month:'long' });
-  }
-
-  function renderOrderList() {
-    currentStep = 'list';
-    const main = document.getElementById('mainContent');
-
-    // Group by serviceDate
-    const groups = {};
-    myOrders.forEach(o => {
-      const key = o.serviceDate || 'ukendt';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(o);
+  function startListeners() {
+    setSyncState('syncing');
+    setTimeout(() => setSyncState('synced'), 1500);
+    // Orders listener
+    const ordersQ = query(collection(db, 'orders'), orderBy('serviceDate', 'asc'));
+    unsubscribeOrders = onSnapshot(ordersQ, snap => {
+      ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (currentView === 'orders') renderOrders();
+      updateStats();
     });
 
-    const groupKeys = Object.keys(groups).sort();
-    const groupHTML = groupKeys.map(key => {
-      const label = formatServiceDate(groups[key][0]);
-      return `
-        <div class="day-section">
-          <div class="day-label">📅 ${label}</div>
-          ${groups[key].map(o => renderOrderCard(o)).join('')}
-        </div>`;
-    }).join('');
+    // Reports listener
+    const reportsQ = query(collection(db, 'reports'), orderBy('completedAt', 'desc'));
+    unsubscribeReports = onSnapshot(reportsQ, snap => {
+      reportsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (currentView === 'reports') renderReports();
+    });
+
+    // Team locations listener
+    unsubscribeLocations = onSnapshot(collection(db, 'locations'), snap => {
+      snap.docs.forEach(d => { teamLocations[d.id] = d.data(); });
+      if (currentView === 'map') renderMap();
+    });
+  }
+
+  function updateStats() {
+    const total = ordersData.length;
+    const completed = ordersData.filter(o => o.status === 'completed').length;
+    const pending = ordersData.filter(o => o.status === 'pending' || o.status === 'uploaded').length;
+    const active = new Set(ordersData.filter(o => o.status === 'inProgress').map(o => o.teamId)).size;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statCompleted').textContent = completed;
+    document.getElementById('statPending').textContent = pending;
+    document.getElementById('statActive').textContent = active;
+  }
+
+  // ── PDF UPLOAD & PARSE ────────────────────────────────────────
+  async function loadPdfJs() {
+    if (window.pdfjsLib) return;
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve();
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function extractTextFromPDF(file) {
+    await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => item.str).join(' ');
+      pages.push(text);
+    }
+    return pages;
+  }
+
+  function parseOrdersFromPages(pages) {
+    const orders = [];
+    let i = 0;
+    while (i < pages.length) {
+      const text = pages[i];
+      if (text.includes('1/3') || (text.includes('Service Report') && text.includes('Print'))) {
+        const order = parseOneOrder(pages, i);
+        if (order && order.orderNumber) orders.push(order);
+        i += 3;
+      } else { i++; }
+    }
+    return orders;
+  }
+
+  function parseOneOrder(pages, startIdx) {
+    const p1 = pages[startIdx] || '';
+    const p3 = pages[startIdx + 2] || '';
+    const fixSpaces = s => s.replace(/([a-zæøå])([A-ZÆØÅ])/g, '$1 $2').replace(/(\d{4})([A-ZÆØÅ])/g, '$1 $2').replace(/\s+/g, ' ').trim();
+    const get = pattern => { const m = p1.match(pattern); return m ? m[1].trim() : ''; };
+
+    const customerName = fixSpaces(get(/Customer\s*name\s+([^\n]+?)(?=Customer|Postal|Primary|$)/i));
+    const address1 = fixSpaces(get(/Customer\s*address\s*1\s+(.+?)(?=Customer|Postal|$)/i));
+    const postal = fixSpaces(get(/Postal\s*code[/\w]*\s+(.+?)(?=Primary|Secondary|Mobile|$)/i));
+    const mobile = get(/Mobile\s*phone\s+(\+?[\d]+)/i);
+    const email = get(/Email\s+(\S+@\S+)/i);
+    const orderNumber = get(/Order\s*number\s+(\d{10})/i);
+    const deliveryOrder = get(/Delivery\s*order\s*number\s+(\S+)/i);
+    const store = fixSpaces(get(/Originating\s*store\s+(.+?)(?=Order|Delivery|$)/i));
+    const provider = fixSpaces(get(/Service\s*provider\s+(.+?)(?=Service\s*product|$)/i)) || 'Bring E-Commerce & Logistics A/S';
+    const product = get(/Service\s*product\s+(\w+)/i) || 'Assembly';
+
+    const dateMatches = [...p1.matchAll(/(\d{2}-\d{2}-\d{4})\s+(\d{2}:\d{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d{2}:\d{2})/g)];
+    const serviceDates = dateMatches.map(m => `${m[1]} ${m[2]} — ${m[3]} ${m[4]}`);
+    const serviceDate = dateMatches.length > 0
+      ? dateMatches[0][1].split('-').reverse().join('-')
+      : getTomorrow();
+
+    const articles = parseArticles(p3);
+
+    return { orderNumber, deliveryOrderNumber: deliveryOrder, customerName,
+      customerAddress1: address1, postalCityState: postal, mobile, email,
+      serviceProvider: provider, serviceProduct: product, originatingStore: store,
+      serviceDates, serviceDate, articles,
+      printDate: new Date().toLocaleDateString('da-DK') };
+  }
+
+  function parseArticles(text) {
+    const articles = [];
+    const lines = text.split(/\s{2,}|\n/);
+    for (const line of lines) {
+      const m = line.match(/(.+?)\s+(\d+[,.]?\d*)\s+(\d+[,.]?\d*)\s+(\d+[,.]?\d*)\s+(\d{8})\s+(\d+)/);
+      if (m) {
+        articles.push({ description: m[1].trim().replace(/([a-zæøå])([A-ZÆØÅ])/g, '$1 $2'),
+          netPrice: m[2], vat: m[3], grossPrice: m[4], itemNo: m[5], qty: m[6], errorCode: '' });
+      }
+    }
+    return articles;
+  }
+
+  async function handlePDFUpload(files) {
+    const uploadArea = document.getElementById('uploadArea');
+    uploadArea.innerHTML = `<div class="upload-processing"><div class="spin"></div><p>${t().processing}</p></div>`;
+
+    for (const file of files) {
+      if (file.type !== 'application/pdf') continue;
+      try {
+        showToast(`Analyserer ${file.name}...`, 'info');
+        const pages = await extractTextFromPDF(file);
+        const orders = parseOrdersFromPages(pages);
+
+        if (orders.length === 0) {
+          showToast(`Ingen ordrer fundet i ${file.name}`, 'error');
+          continue;
+        }
+
+        const storageRef = ref(storage, `pdfs/${Date.now()}_${file.name}`);
+        const snap = await uploadBytes(storageRef, file);
+        const pdfUrl = await getDownloadURL(snap.ref);
+
+        for (const order of orders) {
+          await addDoc(collection(db, 'orders'), {
+            ...order, fileName: file.name, pdfUrl,
+            status: 'uploaded', uploadedAt: new Date().toISOString(), teamId: null,
+          });
+        }
+        showToast(`${file.name}: ${orders.length} kunde(r) oprettet`, 'success');
+      } catch(e) {
+        showToast(`Fejl ved upload: ${file.name}`, 'error');
+        console.error(e);
+      }
+    }
+    resetUploadArea();
+  }
+
+  function getTomorrow() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  function resetUploadArea() {
+    const uploadArea = document.getElementById('uploadArea');
+    uploadArea.innerHTML = `
+      <div class="upload-icon">📄</div>
+      <p class="upload-title">${t().dragDrop}</p>
+      <p class="upload-sub">${t().orClick}</p>
+      <input type="file" id="fileInput" accept=".pdf" multiple style="display:none">
+    `;
+    setupUploadEvents();
+  }
+
+  function setupUploadEvents() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadArea.onclick = () => fileInput.click();
+    fileInput.onchange = e => handlePDFUpload(Array.from(e.target.files));
+
+    uploadArea.ondragover = e => { e.preventDefault(); uploadArea.classList.add('dragover'); };
+    uploadArea.ondragleave = () => uploadArea.classList.remove('dragover');
+    uploadArea.ondrop = e => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      handlePDFUpload(Array.from(e.dataTransfer.files));
+    };
+  }
+
+  // ── ASSIGN TEAM ───────────────────────────────────────────────
+  async function assignTeam(orderId, teamId, serviceDate) {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        teamId,
+        serviceDate,
+        status: 'pending',
+        assignedAt: new Date().toISOString()
+      });
+      showToast('Team tildelt!', 'success');
+    } catch(e) {
+      showToast('Fejl ved tildeling', 'error');
+    }
+  }
+
+  async function deleteOrder(orderId) {
+    if (!confirm('Slet denne ordre?')) return;
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      showToast('Ordre slettet', 'success');
+    } catch(e) {
+      showToast('Fejl ved sletning', 'error');
+    }
+  }
+
+  // ── NAVIGATION ────────────────────────────────────────────────
+  function navigateTo(view) {
+    currentView = view;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector(`[data-view="${view}"]`);
+    if (navItem) navItem.classList.add('active');
+
+    const main = document.getElementById('mainContent');
+    main.innerHTML = '';
+
+    switch(view) {
+      case 'orders': renderOrders(); break;
+      case 'upload': renderUpload(); break;
+      case 'reports': renderReports(); break;
+      case 'map': renderMap(); break;
+      case 'checkins': renderCheckins(); break;
+    }
+  }
+
+  // ── RENDER FUNCTIONS ──────────────────────────────────────────
+  function renderNav() {
+    document.getElementById('navBar').innerHTML = `
+      <div class="nav-brand">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-name">Smart Logistics</span>
+        <span class="brand-role">Admin</span>
+      </div>
+      <div class="nav-items">
+        <button class="nav-item active" data-view="orders" onclick="navigateTo('orders')">
+          <span>📋</span><span>${t().orders}</span>
+        </button>
+        <button class="nav-item" data-view="upload" onclick="navigateTo('upload')">
+          <span>📤</span><span>${t().upload}</span>
+        </button>
+        <button class="nav-item" data-view="reports" onclick="navigateTo('reports')">
+          <span>📊</span><span>${t().reports}</span>
+        </button>
+        <button class="nav-item" data-view="map" onclick="navigateTo('map')">
+          <span>🗺️</span><span>${t().map}</span>
+        </button>
+        <button class="nav-item" data-view="checkins" onclick="navigateTo('checkins')">
+          <span>📍</span><span>${currentLang==='da'?'Check-in':'Check-ins'}</span>
+        </button>
+      </div>
+      <div class="nav-actions">
+        <button class="btn-sm btn-delete" onclick="showClearDataModal()" style="white-space:nowrap" title="${currentLang==='da'?'Ryd alle data':'Clear all data'}">🗑 ${currentLang==='da'?'Ryd data':'Clear data'}</button>
+        <div id="syncIndicator" class="sync-bar syncing"><div class="sync-dot pulse"></div>${currentLang==='da'?'Synkroniserer...':'Syncing...'}</div>
+        <button class="theme-toggle" onclick="toggleTheme()">${currentTheme==='dark'?'☀️ Lyst':'🌙 Mørkt'}</button>
+        <button class="lang-toggle" onclick="toggleLang()">${currentLang === 'da' ? '🇬🇧 EN' : '🇩🇰 DA'}</button>
+        <button class="logout-btn" onclick="logout()">↩ ${t().logout}</button>
+      </div>
+    `;
+  }
+
+  function renderOrders() {
+    const main = document.getElementById('mainContent');
+    const tomorrow = getTomorrow();
+    const todayOrders = ordersData.filter(o => o.serviceDate === tomorrow || o.serviceDate === new Date().toISOString().split('T')[0]);
+    const otherOrders = ordersData.filter(o => o.serviceDate !== tomorrow && o.serviceDate !== new Date().toISOString().split('T')[0]);
 
     main.innerHTML = `
-      <div class="list-header">
-        <h1>${t().myOrders}</h1>
-        <p style="color:var(--text2);font-size:.8rem;margin-top:.25rem">
-          ${myOrders.length} ${currentLang==='da'?'opgave(r) tildelt':'task(s) assigned'}
-        </p>
+      <div class="page-header">
+        <h1>${t().orders}</h1>
+        <div class="stats-row">
+          <div class="stat-chip"><span id="statTotal">0</span><label>${t().totalOrders}</label></div>
+          <div class="stat-chip completed"><span id="statCompleted">0</span><label>${t().completedToday}</label></div>
+          <div class="stat-chip pending"><span id="statPending">0</span><label>${t().pendingOrders}</label></div>
+          <div class="stat-chip active"><span id="statActive">0</span><label>${t().activeTeams}</label></div>
+        </div>
       </div>
-      ${groupHTML || '<div class="empty-state"><div style="font-size:3rem">📭</div><p>' + t().noOrders + '</p></div>'}
+      <div class="orders-section">
+        <h2 class="section-title">📅 ${t().tomorrow} (${tomorrow})</h2>
+        <div class="orders-grid" id="tomorrowOrders">
+          ${todayOrders.length ? todayOrders.map(o => renderOrderCard(o)).join('') : `<p class="empty">${t().noOrders}</p>`}
+        </div>
+        <h2 class="section-title" style="margin-top:2rem">📦 ${t().orders}</h2>
+        <div class="orders-grid" id="otherOrders">
+          ${otherOrders.length ? otherOrders.map(o => renderOrderCard(o)).join('') : `<p class="empty">${t().noOrders}</p>`}
+        </div>
+      </div>
     `;
+    updateStats();
   }
 
   function renderOrderCard(order) {
-    const statusColors = { pending:'#E8A83E', inProgress:'#3E8BE8', completed:'#3EBE6B', failed:'#E83E3E', uploaded:'#888' };
-    const statusLabels = { pending:t().pending, inProgress:t().inProgress, completed:t().completed, failed:t().failed, uploaded:t().pending };
-    const color = statusColors[order.status] || '#888';
-    const canStart = order.status !== 'completed' && order.status !== 'failed';
+    const team = TEAMS.find(t => t.id === order.teamId);
+    const statusColors = {
+      uploaded: '#666', pending: '#E8A83E', inProgress: '#3E8BE8',
+      completed: '#3EBE6B', failed: '#E83E3E'
+    };
+    const statusLabels = {
+      uploaded: t().uploaded, pending: t().pending,
+      inProgress: t().inProgress, completed: t().completed, failed: t().failed
+    };
 
     return `
-      <div class="order-card-team" onclick="${canStart ? ('openJob(\'' + order.id + '\')') : ''}">
-        <div class="order-card-top">
-          <div>
-            <div class="order-num-team">#${order.orderNumber}</div>
-            <div class="order-customer-team">${order.customerName || order.fileName}</div>
+      <div class="order-card" data-id="${order.id}">
+        <div class="order-card-header">
+          <div class="order-number">#${order.orderNumber}</div>
+          <div class="order-status" style="background:${statusColors[order.status] || '#666'}20; color:${statusColors[order.status] || '#666'}; border:1px solid ${statusColors[order.status] || '#666'}40">
+            ${statusLabels[order.status] || order.status}
           </div>
-          <div class="status-dot" style="background:${color}20; color:${color}; border:1px solid ${color}40">${statusLabels[order.status] || order.status}</div>
         </div>
-        ${(order.customerAddress1||order.postalCityState) ? '<div class="order-address-team">📍 ' + (order.customerAddress1||'')+' '+(order.postalCityState?'· '+order.postalCityState:'')+'</div>' : ''}
-        <div class="order-actions-team">
-          ${order.pdfUrl ? '<a href="' + order.pdfUrl + '" target="_blank" class="card-btn btn-pdf" onclick="event.stopPropagation()">📄 PDF</a>' : ''}
-          ${canStart ? '<div class="card-btn btn-start">' + (order.status==='inProgress'?'▶ Fortsæt':t().startJob) + ' →</div>' : '<div class="card-btn btn-done">✓ ' + t().completed + '</div>'}
+        <div class="order-body">
+          <div class="order-field">
+            <label>${t().customer}</label>
+            <span>${order.customerName || order.fileName}</span>
+          </div>
+          <div class="order-field">
+            <label>${t().assignDate}</label>
+            <input type="date" class="date-input" value="${order.serviceDate || ''}" 
+              onchange="updateServiceDate('${order.id}', this.value)">
+          </div>
+          <div class="order-field">
+            <label>${t().team}</label>
+            <select class="team-select" onchange="assignTeam('${order.id}', this.value, '${order.serviceDate || getTomorrow()}')">
+              <option value="">${t().selectTeam}</option>
+              ${TEAMS.map(tm => `<option value="${tm.id}" ${order.teamId === tm.id ? 'selected' : ''}>${tm.name}</option>`).join('')}
+            </select>
+          </div>
+          ${team ? `<div class="team-badge" style="background:${team.color}20; color:${team.color}; border:1px solid ${team.color}40">● ${team.name}</div>` : ''}
+        </div>
+        <div class="order-actions">
+          ${order.pdfUrl ? `<a href="${order.pdfUrl}" target="_blank" class="btn-sm btn-view">📄 PDF</a>` : ''}
+          ${order.status === 'completed' ? `<button class="btn-sm btn-report" onclick="viewReport('${order.id}')">📊 ${t().viewReport}</button>` : ''}
+          <button class="btn-sm btn-delete" onclick="deleteOrder('${order.id}')">🗑</button>
         </div>
       </div>
     `;
   }
 
-  // ── JOB FLOW ─────────────────────────────────────────────────
-  function openJob(orderId) {
-    currentOrder = myOrders.find(o => o.id === orderId);
-    if (!currentOrder) return;
-    beforePhotos = currentOrder.beforePhotos || [];
-    afterPhotos = currentOrder.afterPhotos || [];
-    jobStep = currentOrder.jobStep || 1;
-    currentStep = 'job';
-    renderJobView();
+  async function updateServiceDate(orderId, date) {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { serviceDate: date });
+    } catch(e) {
+      showToast('Fejl ved opdatering', 'error');
+    }
   }
 
-  function renderJobView() {
+  function renderUpload() {
     const main = document.getElementById('mainContent');
     main.innerHTML = `
-      <div class="job-header">
-        <button class="back-btn" onclick="renderOrderList()">← Tilbage</button>
-        <div class="job-title">#${currentOrder.orderNumber}</div>
-        <div class="job-customer">${currentOrder.customerName || ''}</div>
-        ${currentOrder.customerAddress1 ? '<div class="job-address">📍 '+currentOrder.customerAddress1+(currentOrder.postalCityState?', '+currentOrder.postalCityState:'')+'</div>' : ''}
+      <div class="page-header">
+        <h1>${t().uploadPDF}</h1>
       </div>
-      <div class="steps-bar">
-        <div class="step-item ${jobStep >= 1 ? 'active' : ''}" onclick="gotoStep(1)">
-          <div class="step-num">1</div>
-          <div class="step-label">${t().step1}</div>
+      <div class="upload-container">
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📄</div>
+          <p class="upload-title">${t().dragDrop}</p>
+          <p class="upload-sub">${t().orClick}</p>
+          <input type="file" id="fileInput" accept=".pdf" multiple style="display:none">
         </div>
-        <div class="step-line ${jobStep >= 2 ? 'active' : ''}"></div>
-        <div class="step-item ${jobStep >= 2 ? 'active' : ''}" onclick="gotoStep(2)">
-          <div class="step-num">2</div>
-          <div class="step-label">${t().step2}</div>
-        </div>
-        <div class="step-line ${jobStep >= 3 ? 'active' : ''}"></div>
-        <div class="step-item ${jobStep >= 3 ? 'active' : ''}" onclick="gotoStep(3)">
-          <div class="step-num">3</div>
-          <div class="step-label">${t().step3}</div>
+        <div class="upload-help">
+          <h3>📌 Vejledning</h3>
+          <p>Upload de PDF-servicerapporter du modtager. Systemet registrerer dem automatisk og gør dem tilgængelige for teams næste dag.</p>
+          <p style="margin-top:.5rem; opacity:.6">Filnavnet bør indeholde ordrenummeret (10 cifre).</p>
         </div>
       </div>
-      <div id="stepContent"></div>
     `;
-    renderStep();
+    setupUploadEvents();
   }
 
-  function gotoStep(n) {
-    if (n > jobStep && n > 1) return; // can't skip ahead
-    jobStep = n;
-    renderStep();
-  }
-
-  function renderStep() {
-    const content = document.getElementById('stepContent');
-    if (jobStep === 1) renderStep1(content);
-    else if (jobStep === 2) renderStep2(content);
-    else if (jobStep === 3) renderStep3(content);
-  }
-
-  // STEP 1: Arrival + Before photos
-  function renderStep1(el) {
-    el.innerHTML = `
-      <div class="step-body">
-        <div class="info-card">
-          <h3>📋 ${t().orderNum}: ${currentOrder.orderNumber}</h3>
-          ${currentOrder.customerAddress ? '<p>📍 ' + currentOrder.customerAddress + '</p>' : ''}
-          ${currentOrder.pdfUrl ? '<a href="'+currentOrder.pdfUrl+'" target="_blank" class="pdf-link">📄 '+t().viewPDF+'</a>' : ''}
+  function renderReports() {
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `
+      <div class="page-header">
+        <h1>${t().reports}</h1>
+        <div class="report-controls">
+          <input type="text" id="reportSearch" placeholder="${currentLang==='da'?'Søg ordre, kunde...':'Search order, customer...'}"
+            class="search-input" oninput="filterReports()">
+          <select id="reportTeamFilter" class="filter-select" onchange="filterReports()">
+            <option value="">${currentLang==='da'?'Alle teams':'All teams'}</option>
+            ${TEAMS.map(tm => '<option value="'+tm.id+'">'+tm.name+'</option>').join('')}
+          </select>
+          <select id="reportStatusFilter" class="filter-select" onchange="filterReports()">
+            <option value="">${currentLang==='da'?'Alle statuser':'All statuses'}</option>
+            <option value="completed">${t().completed}</option>
+            <option value="failed">${t().failed}</option>
+            <option value="incomplete">Ufuldstændig</option>
+          </select>
+          <button class="btn-sm btn-view" onclick="exportReportsCSV()" style="white-space:nowrap">📊 CSV</button>
         </div>
-        
-        <div class="section-card">
-          <h3>📸 ${t().photosBefore}</h3>
-          <div class="photos-grid" id="beforePhotosGrid">
-            ${renderPhotoThumbs(beforePhotos)}
-          </div>
-          <label class="photo-btn">
-            <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this, 'before')">
-            📷 ${t().addPhoto}
-          </label>
-        </div>
-
-        <button class="primary-btn" onclick="markArrived()" ${currentOrder.status === 'inProgress' ? 'style="background:#3EBE6B"' : ''}>
-          ${currentOrder.status === 'inProgress' ? '✓ Ankomst registreret — Fortsæt →' : '📍 ' + t().arrivedBtn}
-        </button>
+      </div>
+      <div class="reports-list" id="reportsList">
+        ${reportsData.length ? reportsData.map(r => renderReportRow(r)).join('') : '<div class="empty-state"><p>' + t().noOrders + '</p></div>'}
       </div>
     `;
   }
 
-  async function markArrived() {
-    if (!currentOrder) return;
-    try {
-      await updateDoc(doc(db, 'orders', currentOrder.id), {
-        status: 'inProgress',
-        arrivedAt: new Date().toISOString(),
-        jobStep: 2,
-        beforePhotos
-      });
-      currentOrder.status = 'inProgress';
-      currentOrder.jobStep = 2;
-      jobStep = 2;
-      showToast(t().arrivedConfirm, 'success');
-      renderStep();
-    } catch(e) {
-      showToast('Fejl ved registrering', 'error');
-    }
-  }
-
-  // STEP 2: Work in progress
-  function renderStep2(el) {
-    el.innerHTML = `
-      <div class="step-body">
-        <div class="info-card">
-          <h3>🔧 Arbejde i gang</h3>
-          <p style="opacity:.6; font-size:.85rem">Tag efter-billeder når du er færdig</p>
-        </div>
-
-        <div class="section-card">
-          <h3>📸 ${t().photosAfter}</h3>
-          <div class="photos-grid" id="afterPhotosGrid">
-            ${renderPhotoThumbs(afterPhotos)}
-          </div>
-          <label class="photo-btn">
-            <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this, 'after')">
-            📷 ${t().addPhoto}
-          </label>
-        </div>
-
-        <button class="primary-btn" onclick="gotoReportStep()">
-          📋 ${t().fillReport} →
-        </button>
-      </div>
-    `;
-  }
-
-  async function gotoReportStep() {
-    try {
-      await updateDoc(doc(db, 'orders', currentOrder.id), { afterPhotos, jobStep: 3 });
-      currentOrder.jobStep = 3;
-      jobStep = 3;
-      renderStep();
-    } catch(e) {
-      jobStep = 3;
-      renderStep();
-    }
-  }
-
-  // STEP 3: Service Report
-  function renderStep3(el) {
-    el.innerHTML = `
-      <div class="step-body">
-        <div class="section-card">
-          <h3>📋 Servicerapport</h3>
-
-          <div class="form-group">
-            <label>${t().startTime}</label>
-            <input type="time" id="startTime" class="form-input" value="${currentOrder.startTime || ''}">
-          </div>
-          <div class="form-group">
-            <label>${t().endTime}</label>
-            <input type="time" id="endTime" class="form-input" value="${currentOrder.endTime || ''}">
-          </div>
-          <div class="form-group">
-            <label>${t().hours}</label>
-            <input type="number" id="hoursSpent" class="form-input" min="0" step="0.5" placeholder="0.0" value="${currentOrder.hoursSpent || ''}">
-          </div>
-          <div class="form-group">
-            <label>${t().assemblers}</label>
-            <input type="number" id="numAssemblers" class="form-input" min="1" placeholder="1" value="${currentOrder.numAssemblers || ''}">
-          </div>
-
-          <div class="form-group">
-            <label>${t().additionalServices}</label>
-            <div class="radio-row">
-              <label class="radio-opt"><input type="radio" name="addSvc" value="yes"> ${t().yes}</label>
-              <label class="radio-opt"><input type="radio" name="addSvc" value="no" checked> ${t().no}</label>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>${t().contactedIkea}</label>
-            <div class="radio-row">
-              <label class="radio-opt"><input type="radio" name="ikea" value="yes"> ${t().yes}</label>
-              <label class="radio-opt"><input type="radio" name="ikea" value="no" checked> ${t().no}</label>
-            </div>
-          </div>
-          <div class="form-group" id="ikeaRefGroup" style="display:none">
-            <label>${t().ikeaRef}</label>
-            <input type="text" id="ikeaRef" class="form-input" placeholder="Reference nr.">
-          </div>
-        </div>
-
-        <!-- STATUS -->
-        <div class="section-card">
-          <h3>✅ Service status</h3>
-          <div class="status-options">
-            <label class="status-opt completed-opt">
-              <input type="radio" name="svcStatus" value="completed">
-              <span>✓ ${t().serviceCompleted}</span>
-            </label>
-            <label class="status-opt failed-opt">
-              <input type="radio" name="svcStatus" value="failed">
-              <span>✕ ${t().serviceFailed}</span>
-            </label>
-            <label class="status-opt incomplete-opt">
-              <input type="radio" name="svcStatus" value="incomplete">
-              <span>◐ ${t().serviceIncomplete}</span>
-            </label>
-          </div>
-          <div id="failReasonSection" style="display:none; margin-top:.75rem">
-            <label class="form-label">${t().failReason}</label>
-            ${['customerNotHome','articlesMissing','noCapacity','inappropriateConditions','paymentProblems'].map(r => `
-              <label class="check-opt"><input type="checkbox" name="failReason" value="${r}"> ${t()[r]}</label>
-            `).join('')}
-          </div>
-          <div id="incompleteReasonSection" style="display:none; margin-top:.75rem">
-            <label class="form-label">${t().incompleteReason}</label>
-            ${['articlesMissing','incorrectArticles','damagedArticles','preNotCorrect','salesError','paymentProblems','installError','changedMind'].map(r => `
-              <label class="check-opt"><input type="checkbox" name="incompleteReason" value="${r}"> ${t()[r]}</label>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- WALL MOUNT DISCLAIMER -->
-        <div class="section-card disclaimer-toggle-card">
-          <h3>⚠️ ${t().wallMount}</h3>
-          <div class="radio-row">
-            <label class="radio-opt"><input type="radio" name="wallRefuse" value="yes" onchange="showDisclaimer(true)"> ${t().yes}</label>
-            <label class="radio-opt"><input type="radio" name="wallRefuse" value="no" checked onchange="showDisclaimer(false)"> ${t().no}</label>
-          </div>
-        </div>
-
-        <div class="section-card disclaimer-card" id="disclaimerCard" style="display:none">
-          <h3>📜 ${t().disclaimerTitle}</h3>
-          <div class="disclaimer-text">${t().disclaimerText}</div>
-          <p class="sig-instruction">${t().disclaimerSign}:</p>
-          <div class="sig-container">
-            <canvas id="disclaimerCanvas" class="sig-canvas"></canvas>
-            <button class="clear-sig-btn" onclick="clearSig('disclaimer')">✕ ${t().clearSig}</button>
-          </div>
-        </div>
-
-        <!-- COMMENTS -->
-        <div class="section-card">
-          <h3>💬 ${t().comments}</h3>
-          <textarea id="reportComments" class="form-textarea" placeholder="${t().comments}..." rows="3">${currentOrder.comments || ''}</textarea>
-        </div>
-
-        <!-- SATISFACTION -->
-        <div class="section-card">
-          <div class="radio-row">
-            <span style="font-size:.85rem; opacity:.8">${t().satisfactionYes}?</span>
-            <label class="radio-opt"><input type="radio" name="satisfaction" value="yes"> ${t().yes}</label>
-            <label class="radio-opt"><input type="radio" name="satisfaction" value="no"> ${t().no}</label>
-          </div>
-        </div>
-
-        <!-- TECH SIGNATURE -->
-        <div class="section-card">
-          <h3>✍️ ${t().techSignature}</h3>
-          <p class="sig-instruction">${t().signHere}:</p>
-          <div class="sig-container">
-            <canvas id="techCanvas" class="sig-canvas"></canvas>
-            <button class="clear-sig-btn" onclick="clearSig('tech')">✕ ${t().clearSig}</button>
-          </div>
-        </div>
-
-        <!-- CUSTOMER SIGNATURE -->
-        <div class="section-card">
-          <h3>✍️ ${t().customerSignature}</h3>
-          <p class="sig-instruction">${t().signHere}:</p>
-          <div class="sig-container">
-            <canvas id="customerCanvas" class="sig-canvas"></canvas>
-            <button class="clear-sig-btn" onclick="clearSig('customer')">✕ ${t().clearSig}</button>
-          </div>
-        </div>
-
-        <button class="primary-btn submit-btn" id="submitBtn" onclick="submitReport()">
-          📤 ${t().submitReport}
-        </button>
-        <div style="height:2rem"></div>
-      </div>
-    `;
-
-    // Setup radio listeners
-    document.querySelectorAll('input[name="svcStatus"]').forEach(r => {
-      r.addEventListener('change', () => {
-        document.getElementById('failReasonSection').style.display = r.value === 'failed' ? 'block' : 'none';
-        document.getElementById('incompleteReasonSection').style.display = r.value === 'incomplete' ? 'block' : 'none';
-      });
+  function filterReports() {
+    const search = document.getElementById('reportSearch')?.value.toLowerCase() || '';
+    const team = document.getElementById('reportTeamFilter')?.value || '';
+    const status = document.getElementById('reportStatusFilter')?.value || '';
+    const filtered = reportsData.filter(r => {
+      const matchSearch = !search ||
+        (r.orderNumber||'').toLowerCase().includes(search) ||
+        (r.customerName||'').toLowerCase().includes(search) ||
+        (r.teamName||'').toLowerCase().includes(search);
+      const matchTeam = !team || r.teamId === team;
+      const matchStatus = !status || r.serviceStatus === status;
+      return matchSearch && matchTeam && matchStatus;
     });
-    document.querySelector('input[name="ikea"][value="yes"]').addEventListener('change', () => {
-      document.getElementById('ikeaRefGroup').style.display = 'block';
-    });
-    document.querySelector('input[name="ikea"][value="no"]').addEventListener('change', () => {
-      document.getElementById('ikeaRefGroup').style.display = 'none';
-    });
-
-    // Setup signature canvases
-    setTimeout(() => {
-      setupSigCanvas('techCanvas', 'tech');
-      setupSigCanvas('customerCanvas', 'customer');
-    }, 100);
+    const list = document.getElementById('reportsList');
+    if (list) list.innerHTML = filtered.length
+      ? filtered.map(r => renderReportRow(r)).join('')
+      : '<div class="empty-state"><p>' + (currentLang==='da'?'Ingen resultater':'No results') + '</p></div>';
   }
 
-  function showDisclaimer(show) {
-    const card = document.getElementById('disclaimerCard');
-    card.style.display = show ? 'block' : 'none';
-    if (show) {
-      setTimeout(() => setupSigCanvas('disclaimerCanvas', 'disclaimer'), 100);
-      card.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      disclaimerSigData = null;
-    }
+  function exportReportsCSV() {
+    const headers = ['Ordre','Kunde','Adresse','Team','Status','Start','Slut','Timer','Montører','Kommentarer','Dato'];
+    const rows = reportsData.map(r => [
+      r.orderNumber||'', r.customerName||'', r.customerAddress1||'',
+      r.teamName||'', r.serviceStatus||'', r.startTime||'', r.endTime||'',
+      r.hoursSpent||'', r.numAssemblers||'', (r.comments||'').replace(/,/g,' '),
+      r.completedAt ? new Date(r.completedAt).toLocaleDateString('da-DK') : ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'rapporter_' + new Date().toLocaleDateString('da-DK').replace(/\//g,'-') + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+    showToast('CSV eksporteret', 'success');
   }
+  window.exportReportsCSV = exportReportsCSV;
 
-  // ── SIGNATURE CANVAS ─────────────────────────────────────────
-  function setupSigCanvas(canvasId, target) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth;
-    canvas.height = 160;
-    ctx.strokeStyle = '#1a1a2e';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    let drawing = false, lx = 0, ly = 0;
-
-    const getPos = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const src = e.touches ? e.touches[0] : e;
-      return { x: src.clientX - rect.left, y: src.clientY - rect.top };
-    };
-
-    const start = (e) => { e.preventDefault(); drawing = true; const p = getPos(e); lx = p.x; ly = p.y; };
-    const move = (e) => {
-      e.preventDefault();
-      if (!drawing) return;
-      const p = getPos(e);
-      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(p.x, p.y); ctx.stroke();
-      lx = p.x; ly = p.y;
-      if (target === 'tech') techSigData = canvas.toDataURL();
-      else if (target === 'customer') customerSigData = canvas.toDataURL();
-      else if (target === 'disclaimer') disclaimerSigData = canvas.toDataURL();
-    };
-    const end = () => { drawing = false; };
-
-    canvas.addEventListener('mousedown', start);
-    canvas.addEventListener('mousemove', move);
-    canvas.addEventListener('mouseup', end);
-    canvas.addEventListener('touchstart', start, { passive: false });
-    canvas.addEventListener('touchmove', move, { passive: false });
-    canvas.addEventListener('touchend', end);
-  }
-
-  function clearSig(target) {
-    const ids = { tech: 'techCanvas', customer: 'customerCanvas', disclaimer: 'disclaimerCanvas' };
-    const canvas = document.getElementById(ids[target]);
-    if (!canvas) return;
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    if (target === 'tech') techSigData = null;
-    else if (target === 'customer') customerSigData = null;
-    else if (target === 'disclaimer') disclaimerSigData = null;
-  }
-
-  // ── PHOTOS ───────────────────────────────────────────────────
-  async function handlePhoto(input, type) {
-    const file = input.files[0];
-    if (!file) return;
-    showToast('Uploader billede...', 'info');
+  async function deleteReport(reportId) {
+    if (!confirm(currentLang==='da'?'Slet denne rapport?':'Delete this report?')) return;
     try {
-      const storageRef = ref(storage, `photos/${currentOrder.id}/${type}/${Date.now()}.jpg`);
-      const snap = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snap.ref);
-      if (type === 'before') {
-        beforePhotos.push(url);
-        const grid = document.getElementById('beforePhotosGrid');
-        if (grid) grid.innerHTML = renderPhotoThumbs(beforePhotos);
-      } else {
-        afterPhotos.push(url);
-        const grid = document.getElementById('afterPhotosGrid');
-        if (grid) grid.innerHTML = renderPhotoThumbs(afterPhotos);
-      }
-      showToast(t().photoSaved, 'success');
-    } catch(e) {
-      showToast('Fejl ved upload af billede', 'error');
-    }
-    input.value = '';
+      await deleteDoc(doc(db, 'reports', reportId));
+      showToast(currentLang==='da'?'Rapport slettet':'Report deleted', 'success');
+    } catch(e) { showToast('Fejl ved sletning', 'error'); }
+  }
+  window.deleteReport = deleteReport;
+
+  function renderReportRow(report) {
+    const team = TEAMS.find(tm => tm.id === report.teamId);
+    const statusColors = { completed: 'var(--success)', failed: 'var(--danger)', incomplete: 'var(--warning)' };
+    const color = statusColors[report.serviceStatus] || 'var(--text2)';
+    return `
+      <div class="report-row" onclick="openReportModal('${report.id}')">
+        <div class="report-info">
+          <div class="report-order">#${report.orderNumber || '—'}</div>
+          <div class="report-customer">${report.customerName || '—'}</div>
+          <div class="report-date">${report.completedAt ? new Date(report.completedAt).toLocaleDateString('da-DK') : '—'}</div>
+        </div>
+        <div class="report-right">
+          ${team ? '<div class="team-badge" style="background:'+team.color+'20; color:'+team.color+'">● '+team.name+'</div>' : ''}
+          <div class="report-status" style="color:${color};background:${color}15;border:1px solid ${color}30;font-size:.7rem;padding:.2rem .6rem;border-radius:999px;font-weight:600">${getStatusLabel(report.serviceStatus)}</div>
+          <button class="btn-sm btn-delete" onclick="event.stopPropagation(); deleteReport('${report.id}')" style="padding:.25rem .5rem">🗑</button>
+          <span class="chevron">›</span>
+        </div>
+      </div>
+    `;
   }
 
-  function renderPhotoThumbs(photos) {
-    if (!photos.length) return '<p style="opacity:.4; font-size:.8rem; padding:.5rem 0">Ingen billeder endnu</p>';
-    return photos.map(url => {
-      const safe = encodeURIComponent(url);
-      return '<img src="' + url + '" class="photo-thumb" onclick="openPhoto(decodeURIComponent(\'' + safe + '\'))">';
-    }).join('');
+  function getStatusLabel(s) {
+    const labels = { completed: t().completed, failed: t().failed, incomplete: 'Ufuldstændig' };
+    return labels[s] || s;
+  }
+
+  function openReportModal(reportId) {
+    const report = reportsData.find(r => r.id === reportId);
+    if (!report) return;
+
+    const modal = document.getElementById('reportModal');
+    const content = document.getElementById('reportModalContent');
+
+    content.innerHTML = `
+      <div class="modal-header">
+        <h2>${t().reportFor} #${report.orderNumber}</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="report-detail-grid">
+          <div class="detail-section">
+            <h3>👤 ${t().customer}</h3>
+            <p>${report.customerName || '—'}</p>
+            <p style="opacity:.6">${report.customerAddress || '—'}</p>
+          </div>
+          <div class="detail-section">
+            <h3>📋 ${t().status}</h3>
+            <p class="${report.serviceStatus}">${getStatusLabel(report.serviceStatus)}</p>
+            ${report.failedReason ? `<p style="opacity:.6">${report.failedReason}</p>` : ''}
+          </div>
+          <div class="detail-section">
+            <h3>⏱ Tid</h3>
+            <p>Start: ${report.startTime || '—'}</p>
+            <p>Slut: ${report.endTime || '—'}</p>
+            <p>Timer: ${report.hoursSpent || '—'}</p>
+          </div>
+          <div class="detail-section">
+            <h3>👷 Team</h3>
+            <p>${report.teamName || '—'}</p>
+            <p>Montører: ${report.numAssemblers || '—'}</p>
+          </div>
+        </div>
+        ${report.notes ? `<div class="detail-section"><h3>💬 ${t().notes}</h3><p>${report.notes}</p></div>` : ''}
+        ${report.beforePhotos?.length ? `
+          <div class="detail-section">
+            <h3>📸 ${t().before}</h3>
+            <div class="photo-grid">${report.beforePhotos.map(url => `<img src="${url}" onclick="openPhoto('${url}')" class="thumb">`).join('')}</div>
+          </div>` : ''}
+        ${report.afterPhotos?.length ? `
+          <div class="detail-section">
+            <h3>📸 ${t().after}</h3>
+            <div class="photo-grid">${report.afterPhotos.map(url => `<img src="${url}" onclick="openPhoto('${url}')" class="thumb">`).join('')}</div>
+          </div>` : ''}
+        ${report.techSignature ? `
+          <div class="detail-section">
+            <h3>✍️ Montør underskrift</h3>
+            <img src="${report.techSignature}" class="sig-preview">
+          </div>` : ''}
+        ${report.customerSignature ? `
+          <div class="detail-section">
+            <h3>✍️ Kunde underskrift</h3>
+            <img src="${report.customerSignature}" class="sig-preview">
+          </div>` : ''}
+        ${report.disclaimerSignature ? `
+          <div class="detail-section disclaimer-section">
+            <h3>⚠️ Ansvarsfraskrivelse underskrevet</h3>
+            <img src="${report.disclaimerSignature}" class="sig-preview">
+          </div>` : ''}
+      </div>
+    `;
+    modal.style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('reportModal').style.display = 'none';
   }
 
   function openPhoto(url) {
-    const ov = document.getElementById('photoOverlay');
+    const overlay = document.getElementById('photoOverlay');
     document.getElementById('fullPhoto').src = url;
-    ov.style.display = 'flex';
+    overlay.style.display = 'flex';
   }
 
-  // ── SUBMIT REPORT ────────────────────────────────────────────
-  async function submitReport() {
-    if (!db || !storage) { showToast('Firebase ikke klar - prøv igen', 'error'); return; }
-    const status = document.querySelector('input[name="svcStatus"]:checked')?.value;
-    if (!status) { showToast('Vælg service status', 'error'); return; }
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.textContent = t().saving;
+  function renderMap() {
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `
+      <div class="page-header">
+        <h1>${t().map}</h1>
+      </div>
+      <div class="map-layout">
+        <div class="team-locations-list">
+          ${TEAMS.map(team => {
+            const loc = teamLocations[team.id];
+            return `
+              <div class="location-card">
+                <div class="team-dot" style="background:${team.color}"></div>
+                <div class="location-info">
+                  <div class="location-team">${team.name}</div>
+                  ${loc ? `
+                    <div class="location-coords">${loc.lat?.toFixed(4)}, ${loc.lng?.toFixed(4)}</div>
+                    <div class="location-time">${t().lastSeen}: ${loc.timestamp ? new Date(loc.timestamp).toLocaleTimeString('da-DK') : '—'}</div>
+                    <a href="https://maps.google.com/?q=${loc.lat},${loc.lng}" target="_blank" class="btn-sm btn-view">Åbn i Maps</a>
+                  ` : `<div class="location-time" style="opacity:.4">Ingen lokation</div>`}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="map-placeholder">
+          <div class="map-note">
+            <span style="font-size:3rem">🗺️</span>
+            <p>Integrér Google Maps ved at tilføje din Maps API key her</p>
+            <p style="opacity:.5; font-size:.8rem">Tilføj: &lt;script src="https://maps.googleapis.com/maps/api/js?key=YOUR_KEY"&gt;</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+
+  function renderCheckins() {
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `
+      <div class="page-header">
+        <h1>${currentLang==='da'?'Check-in / Check-ud':'Check-in / Check-out'}</h1>
+        <p style="color:var(--text2); font-size:.85rem; margin-top:.25rem">${currentLang==='da'?'Realtid — opdateres automatisk':'Real-time — updates automatically'}</p>
+      </div>
+      <div class="section-card" style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <table class="checkin-table">
+          <thead>
+            <tr>
+              <th>${currentLang==='da'?'Team':'Team'}</th>
+              <th>${currentLang==='da'?'Kunde':'Customer'}</th>
+              <th>${currentLang==='da'?'Ordre':'Order'}</th>
+              <th>${currentLang==='da'?'Status':'Status'}</th>
+              <th>${currentLang==='da'?'Ankomst':'Arrival'}</th>
+              <th>${currentLang==='da'?'Afsluttet':'Completed'}</th>
+            </tr>
+          </thead>
+          <tbody id="checkinBody">
+            <tr><td colspan="6" style="text-align:center; opacity:.4; padding:2rem">${currentLang==='da'?'Indlæser...':'Loading...'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+    loadCheckins();
+  }
+
+  function loadCheckins() {
+    const q = query(collection(db, 'orders'),
+      where('status', 'in', ['inProgress', 'completed', 'failed']));
+    onSnapshot(q, snap => {
+      const tbody = document.getElementById('checkinBody');
+      if (!tbody) return;
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a,b) => (b.arrivedAt||b.uploadedAt||'') > (a.arrivedAt||a.uploadedAt||'') ? 1 : -1);
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;opacity:.4;padding:2rem">${currentLang==='da'?'Ingen aktive jobs':'No active jobs'}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(o => {
+        const team = TEAMS.find(t => t.id === o.teamId);
+        const statusMap = {
+          inProgress: `<span class="checkin-status working">● ${currentLang==='da'?'I gang':'Working'}</span>`,
+          completed: `<span class="checkin-status done">✓ ${currentLang==='da'?'Færdig':'Done'}</span>`,
+          failed: `<span class="checkin-status" style="background:var(--danger)15;color:var(--danger)">✕ ${currentLang==='da'?'Fejlet':'Failed'}</span>`,
+        };
+        const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'}) : '—';
+        const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}) : '—';
+        return `<tr>
+          <td>${team ? `<span style="color:${team.color}">● ${team.name}</span>` : '—'}</td>
+          <td>${o.customerName||'—'}<br><span style="font-size:.75rem;opacity:.5">${o.customerAddress1||''}</span></td>
+          <td style="font-family:'Space Mono',monospace;font-size:.8rem">#${o.orderNumber||'—'}</td>
+          <td>${statusMap[o.status]||o.status}</td>
+          <td class="checkin-time">${o.arrivedAt ? fmtDate(o.arrivedAt)+' '+fmtTime(o.arrivedAt) : '—'}</td>
+          <td class="checkin-time">${o.completedAt ? fmtDate(o.completedAt)+' '+fmtTime(o.completedAt) : '—'}</td>
+        </tr>`;
+      }).join('');
+    });
+    setSyncState('synced');
+  }
+
+
+  // ── CLEAR ALL DATA ───────────────────────────────────────────
+  const SECRET_DELETE_CODE = "SLET2024";
+  const SECRET_RECOVERY_CODE = "ADMIN2024";
+
+  function showClearDataModal() {
+    const modal = document.createElement('div');
+    modal.id = 'clearDataModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:#000000AA;z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border:2px solid var(--danger);border-radius:20px;padding:2rem;max-width:420px;width:100%">
+        <div style="font-size:2.5rem;text-align:center;margin-bottom:1rem">⚠️</div>
+        <h2 style="color:var(--danger);text-align:center;margin-bottom:.5rem">${currentLang==='da'?'Slet alle data':'Delete all data'}</h2>
+        <p style="color:var(--text2);font-size:.85rem;text-align:center;margin-bottom:1.5rem">
+          ${currentLang==='da'?'Dette sletter ALLE ordrer, rapporter og lokationer permanent. Handling kan ikke fortrydes.':'This permanently deletes ALL orders, reports and locations. This cannot be undone.'}
+        </p>
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Indtast sletningskode':'Enter delete code'}
+        </label>
+        <input id="deleteCodeInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--danger)50;border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:1rem">
+        <div style="display:flex;gap:.75rem">
+          <button onclick="document.getElementById('clearDataModal').remove()"
+            style="flex:1;padding:.8rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-family:inherit">
+            ${currentLang==='da'?'Annuller':'Cancel'}
+          </button>
+          <button onclick="confirmClearData()"
+            style="flex:1;padding:.8rem;background:var(--danger);border:none;border-radius:10px;color:white;cursor:pointer;font-family:inherit;font-weight:700">
+            ${currentLang==='da'?'Slet alt':'Delete all'}
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('deleteCodeInput').focus();
+  }
+  window.showClearDataModal = showClearDataModal;
+
+  async function confirmClearData() {
+    const code = document.getElementById('deleteCodeInput')?.value;
+    if (code !== SECRET_DELETE_CODE) {
+      showToast(currentLang==='da'?'Forkert kode':'Wrong code', 'error');
+      return;
+    }
+    document.getElementById('clearDataModal').remove();
+    showToast(currentLang==='da'?'Sletter data...':'Deleting data...', 'info');
     try {
-      const failedReasons = [...document.querySelectorAll('input[name="failReason"]:checked')].map(c => c.value);
-      const incompleteReasons = [...document.querySelectorAll('input[name="incompleteReason"]:checked')].map(c => c.value);
-      const addSvc = document.querySelector('input[name="addSvc"]:checked')?.value === 'yes';
-      const contactedIkea = document.querySelector('input[name="ikea"]:checked')?.value === 'yes';
-      const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value === 'yes';
-      const wallRefuse = document.querySelector('input[name="wallRefuse"]:checked')?.value === 'yes';
-      const completedAt = new Date().toISOString();
-      let techSigUrl = null, customerSigUrl = null, disclaimerSigUrl = null;
-      try {
-        if (techSigData && techSigData.length > 100) techSigUrl = await uploadDataURL(techSigData, 'sigs/' + currentOrder.id + '/tech.png');
-        if (customerSigData && customerSigData.length > 100) customerSigUrl = await uploadDataURL(customerSigData, 'sigs/' + currentOrder.id + '/customer.png');
-        if (disclaimerSigData && disclaimerSigData.length > 100) disclaimerSigUrl = await uploadDataURL(disclaimerSigData, 'sigs/' + currentOrder.id + '/disclaimer.png');
-      } catch(sigErr) {
-        console.warn('Signatur upload fejl:', sigErr);
+      const cols = ['orders','reports','locations','mail'];
+      for (const col of cols) {
+        const snap = await getDocs(collection(db, col));
+        const deletes = snap.docs.map(d => deleteDoc(doc(db, col, d.id)));
+        await Promise.all(deletes);
       }
-      const reportData = {
-        orderId: currentOrder.id, orderNumber: currentOrder.orderNumber,
-        customerName: currentOrder.customerName || '',
-        customerAddress1: currentOrder.customerAddress1 || '',
-        postalCityState: currentOrder.postalCityState || '',
-        teamId: currentTeam.id, teamName: currentTeam.name,
-        serviceStatus: status, failedReasons, incompleteReasons,
-        startTime: document.getElementById('startTime')?.value || '',
-        endTime: document.getElementById('endTime')?.value || '',
-        hoursSpent: document.getElementById('hoursSpent')?.value || '',
-        numAssemblers: document.getElementById('numAssemblers')?.value || '',
-        additionalServices: addSvc, contactedIkea,
-        ikeaRef: document.getElementById('ikeaRef')?.value || '',
-        comments: document.getElementById('reportComments')?.value || '',
-        satisfaction, wallMountRefused: wallRefuse,
-        beforePhotos, afterPhotos,
-        techSignature: techSigUrl, customerSignature: customerSigUrl, disclaimerSignature: disclaimerSigUrl,
-        completedAt, pdfUrl: currentOrder.pdfUrl || null,
-        articles: currentOrder.articles || [],
-        serviceDates: currentOrder.serviceDates || [],
-        serviceProvider: currentOrder.serviceProvider || '',
-        originatingStore: currentOrder.originatingStore || '',
-        techSignatureData: techSigData,
-        customerSignatureData: customerSigData,
-        disclaimerSignatureData: disclaimerSigData,
-      };
-      // Save to Firestore FIRST — don't let PDF failure block the report
-      showToast('Gemmer rapport...', 'info');
-      const docRef = await addDoc(collection(db, 'reports'), reportData);
-      await updateDoc(doc(db, 'orders', currentOrder.id), {
-        status, completedAt, afterPhotos, jobStep: 3
-      });
-      showToast(t().reportSubmitted, 'success');
-
-      // Then try email
-      try { await sendEmailNotification(reportData); } catch(e) { console.warn('Email fejl:', e); }
-
-      // Then try PDF generation (non-blocking)
-      showToast('Genererer PDF...', 'info');
-      let reportPdfUrl = null, disclaimerPdfUrl = null;
-      try {
-        reportPdfUrl = await generateAndUploadReportPDF(reportData);
-        if (wallRefuse && disclaimerSigData) {
-          disclaimerPdfUrl = await generateAndUploadDisclaimerPDF(reportData);
-        }
-        // Update Firestore with PDF urls
-        await updateDoc(doc(db, 'orders', currentOrder.id), { reportPdfUrl, disclaimerPdfUrl });
-        await updateDoc(docRef, { reportPdfUrl, disclaimerPdfUrl });
-      } catch(pdfErr) {
-        console.warn('PDF fejl (rapport er stadig gemt):', pdfErr);
-        showToast('Rapport gemt — PDF fejlede', 'error');
-      }
-
-      showDownloadOptions(reportPdfUrl, disclaimerPdfUrl, reportData.orderNumber);
-      setTimeout(() => renderOrderList(), 4000);
+      showToast(currentLang==='da'?'Alle data slettet':'All data deleted', 'success');
+      navigateTo('orders');
     } catch(e) {
-      console.error(e);
-      showToast('Fejl ved indsendelse', 'error');
-      btn.disabled = false;
-      btn.textContent = `📤 ${t().submitReport}`;
+      showToast('Fejl: ' + e.message, 'error');
     }
   }
+  window.confirmClearData = confirmClearData;
 
-  function showDownloadOptions(reportUrl, disclaimerUrl, orderNum) {
-    const ov = document.createElement('div');
-    ov.className = 'download-overlay';
-    ov.innerHTML = `
-      <div class="download-card">
-        <div style="font-size:2.5rem">✅</div>
-        <h2 style="margin:.5rem 0">Rapport indsendt!</h2>
-        <p style="opacity:.6; font-size:.85rem; margin-bottom:1.5rem">PDF genereret og gemt</p>
-        ${reportUrl ? '<a href="' + reportUrl + '" download="servicerapport_' + orderNum + '.pdf" class="download-btn" target="_blank">📄 Download Servicerapport</a>' : ''}
-        ${disclaimerUrl ? '<a href="' + disclaimerUrl + '" download="ansvarsfraskrivelse_' + orderNum + '.pdf" class="download-btn" style="background:var(--warning)15;color:var(--warning);border-color:var(--warning)40" target="_blank">⚠️ Download Ansvarsfraskrivelse</a>' : ''}
-        <button class="download-close" onclick="this.closest('.download-overlay').remove()">Luk</button>
-      </div>`;
-    document.body.appendChild(ov);
+  // ── FORGOT PASSWORD ──────────────────────────────────────────
+  function showForgotModal() {
+    const modal = document.createElement('div');
+    modal.id = 'forgotModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:#000000AA;z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;max-width:400px;width:100%">
+        <h2 style="margin-bottom:.5rem">${currentLang==='da'?'Glemt adgangskode':'Forgot password'}</h2>
+        <p style="color:var(--text2);font-size:.85rem;margin-bottom:1.5rem">
+          ${currentLang==='da'?'Indtast gendannelseskoden for at nulstille din adgangskode.':'Enter the recovery code to reset your password.'}
+        </p>
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Gendannelseskode':'Recovery code'}
+        </label>
+        <input id="recoveryCodeInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:.75rem">
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Ny adgangskode':'New password'}
+        </label>
+        <input id="newPasswordInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:1rem">
+        <div style="display:flex;gap:.75rem">
+          <button onclick="document.getElementById('forgotModal').remove()"
+            style="flex:1;padding:.8rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-family:inherit">
+            ${currentLang==='da'?'Annuller':'Cancel'}
+          </button>
+          <button onclick="confirmPasswordReset()"
+            style="flex:1;padding:.8rem;background:var(--accent);border:none;border-radius:10px;color:white;cursor:pointer;font-family:inherit;font-weight:700">
+            ${currentLang==='da'?'Nulstil':'Reset'}
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
+  window.showForgotModal = showForgotModal;
 
-  async function loadJsPDF() {
-    if (window.jspdf) return;
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-
-  function drawPdfCheckbox(pdf, x, y, checked, label) {
-    pdf.setLineWidth(0.4);
-    pdf.rect(x, y, 3.5, 3.5);
-    if (checked) { pdf.line(x, y, x+3.5, y+3.5); pdf.line(x+3.5, y, x, y+3.5); }
-    pdf.setFontSize(8.5); pdf.setFont('helvetica','normal');
-    pdf.text(label, x+5, y+3);
-  }
-
-  async function generateAndUploadReportPDF(report) {
+  async function confirmPasswordReset() {
+    const code = document.getElementById('recoveryCodeInput')?.value;
+    const newPw = document.getElementById('newPasswordInput')?.value;
+    if (code !== SECRET_RECOVERY_CODE) {
+      showToast(currentLang==='da'?'Forkert gendannelseskode':'Wrong recovery code', 'error');
+      return;
+    }
+    if (!newPw || newPw.length < 6) {
+      showToast(currentLang==='da'?'Adgangskode skal være mindst 6 tegn':'Password must be at least 6 characters', 'error');
+      return;
+    }
     try {
-      await loadJsPDF();
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ unit:'mm', format:'a4' });
-      const W=210, margin=20;
-      const order = currentOrder;
-
-      const pageHeader = (n) => {
-        pdf.setFontSize(18); pdf.setFont('helvetica','bold');
-        pdf.text('Service Report', W/2, 18, {align:'center'});
-        pdf.setFontSize(11); pdf.setFont('helvetica','normal');
-        pdf.text(`${n}/3`, W-margin, 18, {align:'right'});
-        pdf.setLineWidth(0.3); pdf.line(margin,21,W-margin,21);
-      };
-
-      // PAGE 1
-      pageHeader(1);
-      let y=30; const lh=7;
-      const addF = (lbl, val) => {
-        pdf.setFontSize(9); pdf.setFont('helvetica','normal');
-        pdf.text(lbl, margin, y);
-        pdf.setLineWidth(0.2); pdf.line(margin+65, y+0.5, W-margin, y+0.5);
-        if(val) pdf.text(String(val), margin+66, y);
-        y+=lh;
-      };
-      addF('Print date', new Date().toLocaleDateString('da-DK'));
-      addF('Customer name', order.customerName||'');
-      addF('Customer address 1', order.customerAddress1||'');
-      addF('Customer address 2', '');
-      addF('Customer address 3', '');
-      addF('Postal code/city/state', order.postalCityState||'');
-      addF('Primary phone', '');
-      addF('Secondary phone', '');
-      addF('Mobile phone', order.mobile||'');
-      addF('Email', order.email||'');
-      addF('Service provider', order.serviceProvider||'Bring E-Commerce & Logistics A/S');
-      addF('Service product', order.serviceProduct||'Assembly');
-      addF('Originating store', order.originatingStore||'');
-      addF('Order number', order.orderNumber||'');
-      addF('Delivery order number', order.deliveryOrderNumber||'');
-      addF('Order attachment exists', 'No');
-      addF('Delivery instructions', '');
-      y+=3; pdf.setFontSize(9); pdf.text('Booked service dates', margin, y); y+=lh;
-      (order.serviceDates||[]).forEach(d=>{ pdf.setFontSize(8); pdf.text(d,margin,y); y+=6; });
-
-      // PAGE 2
-      pdf.addPage(); pageHeader(2); y=30;
-      pdf.setFontSize(9); pdf.text('Filled in by service provider',margin,y); y+=lh;
-      const addF2 = (lbl,val) => {
-        pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.text(lbl,margin,y);
-        pdf.setLineWidth(0.2); pdf.line(margin+87,y+0.5,W-margin,y+0.5);
-        if(val) pdf.text(String(val),margin+88,y); y+=lh;
-      };
-      addF2('Service actual start date/time', report.startTime||'');
-      addF2('Service actual end date/time', report.endTime||'');
-      pdf.text('Additional services needed?',margin,y);
-      drawPdfCheckbox(pdf,margin+90,y-3,report.additionalServices,'Yes');
-      drawPdfCheckbox(pdf,margin+112,y-3,!report.additionalServices,'No'); y+=lh;
-      pdf.text('Hours to complete service',margin,y);
-      pdf.line(margin+87,y+0.5,margin+117,y+0.5);
-      if(report.hoursSpent) pdf.text(String(report.hoursSpent),margin+88,y);
-      pdf.text('hours',margin+120,y); y+=lh;
-      addF2('Who performed the service?(team/name)', report.teamName||'');
-      addF2('Number of assemblers', report.numAssemblers||'');
-      pdf.text('SP have been in contact with IKEA?',margin,y);
-      drawPdfCheckbox(pdf,margin+90,y-3,report.contactedIkea,'Yes');
-      drawPdfCheckbox(pdf,margin+112,y-3,!report.contactedIkea,'No'); y+=lh;
-      addF2('Customer service reference id', report.ikeaRef||'');
-      y+=5;
-      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='completed','Service completed'); y+=lh;
-      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='failed','Service failed'); y+=lh;
-      drawPdfCheckbox(pdf,margin,y-3,report.serviceStatus==='incomplete','Service incomplete'); y+=lh+3;
-      pdf.setFontSize(9); pdf.text('Select failed reason code',margin,y); y+=6;
-      [['Customer not home','customerNotHome'],['No/Not enough capacity','noCapacity'],['Payment problems','paymentProblems']]
-        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
-      [['Articles missing','articlesMissing'],['Inappropriate service conditions','inappropriateConditions']]
-        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.failedReasons||[]).includes(k),l));
-      y+=26;
-      pdf.text('Select incomplete reason code',margin,y); y+=6;
-      [['Articles missing','articlesMissing'],['Damaged articles','damagedArticles'],['Sales error','salesError'],['Installation error','installError']]
-        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
-      [['Incorrect articles','incorrectArticles'],['Pre measurements not correct','preNotCorrect'],['Payment problems','paymentProblems'],['Changed mind','changedMind']]
-        .forEach(([l,k],i) => drawPdfCheckbox(pdf,margin+90,y+i*7.5-3,(report.incompleteReasons||[]).includes(k),l));
-      y+=36;
-      pdf.text('Comments',margin,y); y+=5;
-      if(report.comments){ const ls=pdf.splitTextToSize(report.comments,W-margin*2); pdf.text(ls,margin,y); y+=ls.length*5; }
-      for(let i=0;i<4;i++){ y+=6; pdf.line(margin,y,W-margin,y); }
-      y+=lh;
-      const satLines=pdf.splitTextToSize('The service was without any complaints and performed to the satisfaction of the customer',100);
-      pdf.text(satLines,margin,y);
-      drawPdfCheckbox(pdf,margin+115,y-3,report.satisfaction,'Yes');
-      drawPdfCheckbox(pdf,margin+135,y-3,!report.satisfaction,'No');
-      y=265;
-      pdf.line(margin,y,margin+35,y); pdf.setFontSize(8); pdf.text('Date',margin,y+4);
-      pdf.setFontSize(9); pdf.text(new Date().toLocaleDateString('da-DK'),margin+1,y-1);
-      pdf.line(margin+42,y,margin+125,y); pdf.setFontSize(8); pdf.text('Service provider signature',margin+42,y+4);
-      if(report.techSignatureData){ try{pdf.addImage(report.techSignatureData,'PNG',margin+42,y-17,70,15);}catch(e){} }
-      pdf.line(margin+132,y,W-margin,y); pdf.text('Customer signature',margin+132,y+4);
-      if(report.customerSignatureData){ try{pdf.addImage(report.customerSignatureData,'PNG',margin+132,y-17,35,15);}catch(e){} }
-
-      // PAGE 3
-      pdf.addPage(); pageHeader(3); y=30;
-      pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.text('Service articles',margin,y); y+=8;
-      const cols=[63,18,15,18,22,10,16];
-      ['Description','Net price','VAT','Gross price','Item no','Qty','Error code'].forEach((h,i)=>{
-        let cx=margin; for(let j=0;j<i;j++) cx+=cols[j];
-        pdf.setFontSize(8); pdf.setFont('helvetica','bold');
-        pdf.text(h, cx+1, y);
-      });
-      y+=10; pdf.setLineWidth(0.3); pdf.line(margin,y-2,W-margin,y-2);
-      pdf.setFont('helvetica','normal');
-      (order.articles||[]).forEach(art=>{
-        if(y>272){pdf.addPage();y=25;}
-        const dl=pdf.splitTextToSize(art.description||'',cols[0]-2);
-        pdf.setFontSize(8); pdf.text(dl,margin+1,y);
-        [art.netPrice,art.vat,art.grossPrice,art.itemNo,art.qty,art.errorCode||''].forEach((v,i)=>{
-          let cx=margin; for(let j=0;j<=i;j++) cx+=cols[j];
-          pdf.text(String(v||''),cx+1,y);
-        });
-        y+=Math.max(6,dl.length*4.5);
-      });
-
-      const blob=pdf.output('blob');
-      const sRef=ref(storage,`reports/${currentOrder.id}/servicerapport_${order.orderNumber}.pdf`);
-      const snap=await uploadBytes(sRef,blob);
-      pdf.save(`servicerapport_${order.orderNumber}.pdf`);
-      return getDownloadURL(snap.ref);
-    } catch(e){ console.error('PDF error:',e); return null; }
+      const { updatePassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      await updatePassword(auth.currentUser, newPw);
+      document.getElementById('forgotModal').remove();
+      showToast(currentLang==='da'?'Adgangskode opdateret!':'Password updated!', 'success');
+    } catch(e) {
+      showToast('Fejl: ' + e.message, 'error');
+    }
   }
-
-  async function generateAndUploadDisclaimerPDF(report) {
-    try {
-      await loadJsPDF();
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({unit:'mm',format:'a4'});
-      const W=210,margin=20; let y=25;
-      pdf.setFontSize(13); pdf.setFont('helvetica','bold');
-      pdf.text('Møbelmontering – Ansvarsfraskrivelse',margin,y); y+=8;
-      pdf.setFontSize(10);
-      pdf.text('Ved fravalg af vægforankring af produkt med monteringsservice.',margin,y); y+=8;
-      pdf.setFontSize(9.5); pdf.setFont('helvetica','normal');
-      const paras=[
-        'Hos IKEA har sikkerhed højest prioritet, både når der udvikles, samles og monteres produkter. For at møblerne skal være så sikre som muligt at færdes i og omkring, kræver enkelte produkter fastgørelse til væg for at undgå at de vælter og går i stykker eller skader mennesker, dyr og andet.',
-        'Når du bestiller Monteringsservice i IKEA, vil vi gerne have at du skal føle dig tryg ved at produkterne er sikre at anvende, og derfor indebærer det altid at produkter der kræver fastgørelse til væg, også bliver det.',
-        'Montøren har, før opstart af monteringen, informeret dig om, at der i din service indgår et eller flere produkter der kræver fastgørelse i væg.',
-        'Du har ønsket, ikke at lade montørerne udføre denne del af servicen, og det kan derfor medføre at produktet/produkterne vælter og forårsager alvorlig skade på mennesker, dyr og/eller andet. Ydermere vil produkt og servicegaranti frafalde hvis skaden opstår grundet manglende fastgørelse til væg.',
-        'IKEA og/eller montøren kan derfor ikke tage noget ansvar for de skader der kan indtræffe på grund af at produktet ikke er fastgjort i væggen.',
-        'Du har, med fravalget af vægforankring selv ansvaret for eventuelle skader (både direkte og indirekte) som kan opstå som følge af dette fravalg.',
-      ];
-      paras.forEach(p=>{ y+=2; const ls=pdf.splitTextToSize(p,W-margin*2); pdf.text(ls,margin,y); y+=ls.length*5.2; });
-      y+=5;
-      pdf.text(`Monteringsservice er i dag udført ifølge IKEA ordrenr.: ${report.orderNumber||''}`,margin,y); y+=10;
-      const cl=pdf.splitTextToSize('Med din underskrift bekræfter du som kunde hermed at du er indforstået med indholdet i denne ansvarsfraskrivelse.',W-margin*2);
-      pdf.text(cl,margin,y); y+=cl.length*5.5+10;
-      const city=(currentOrder.postalCityState||'').replace(/^\d+\s*/,'');
-      const fld=(lbl,val)=>{ pdf.setFontSize(9.5); pdf.text(`${lbl}:`,margin,y); pdf.setLineWidth(0.4); pdf.line(margin,y+1,W-margin,y+1); if(val) pdf.text(val,margin+1,y); y+=12; };
-      fld('By',city);
-      fld('Dato',new Date().toLocaleDateString('da-DK'));
-      fld('Navn (med blokbogstaver)','');
-      pdf.text('Kunde signatur:',margin,y); pdf.line(margin,y+1,W-margin,y+1);
-      if(report.disclaimerSignatureData){try{pdf.addImage(report.disclaimerSignatureData,'PNG',margin,y-15,80,15);}catch(e){}}
-      y+=20;
-      pdf.text('Montør signatur:',margin,y); pdf.line(margin,y+1,W-margin,y+1);
-      if(report.techSignatureData){try{pdf.addImage(report.techSignatureData,'PNG',margin,y-15,80,15);}catch(e){}}
-      const blob=pdf.output('blob');
-      const sRef=ref(storage,`reports/${currentOrder.id}/ansvarsfraskrivelse_${report.orderNumber}.pdf`);
-      const snap=await uploadBytes(sRef,blob);
-      pdf.save(`ansvarsfraskrivelse_${report.orderNumber}.pdf`);
-      return getDownloadURL(snap.ref);
-    } catch(e){ console.error('Disclaimer PDF error:',e); return null; }
-  }
-
-  async function uploadDataURL(dataUrl, path) {
-    // Convert data URL to blob without fetch (more reliable cross-browser)
-    const arr = dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--) u8arr[n] = bstr.charCodeAt(n);
-    const blob = new Blob([u8arr], { type: mime });
-    const storageRef = ref(storage, path);
-    const snap = await uploadBytes(storageRef, blob);
-    return getDownloadURL(snap.ref);
-  }
-
-  async function sendEmailNotification(report) {
-    // Firebase Functions would handle actual email sending.
-    // For now, log to Firestore so admin can trigger email via Firebase Extension (Trigger Email)
-    await addDoc(collection(db, 'mail'), {
-      to: ADMIN_EMAIL,
-      message: {
-        subject: `Servicerapport færdig — Ordre #${report.orderNumber} (${report.teamName})`,
-        html: `
-          <h2>Servicerapport indsendt</h2>
-          <table style="border-collapse:collapse; width:100%; font-family:sans-serif">
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Ordre</b></td><td style="padding:8px; border-bottom:1px solid #eee">#${report.orderNumber}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Kunde</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.customerName}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Adresse</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.customerAddress1 || report.customerAddress || ""}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Team</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.teamName}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Status</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.serviceStatus}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Start</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.startTime}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Slut</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.endTime}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Timer</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.hoursSpent}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Montører</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.numAssemblers}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Kommentarer</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.comments}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Vægmontering afvist</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.wallMountRefused ? 'Ja' : 'Nej'}</td></tr>
-            <tr><td style="padding:8px"><b>Kundetilfredshed</b></td><td style="padding:8px">${report.satisfaction ? 'Ja' : 'Nej'}</td></tr>
-          </table>
-          <p style="margin-top:16px; color:#888; font-size:12px">Sendt fra Smart Logistics Service App</p>
-        `
-      }
-    });
-  }
+  window.confirmPasswordReset = confirmPasswordReset;
 
   function showToast(msg, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = msg;
-    document.getElementById('toastContainer').appendChild(toast);
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = msg;
+    document.getElementById('toastContainer').appendChild(t);
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
   }
 
   function toggleLang() {
     currentLang = currentLang === 'da' ? 'en' : 'da';
     localStorage.setItem('sl_lang', currentLang);
-    if (currentTeam) { renderHeader(); if (currentStep === 'list') renderOrderList(); else renderJobView(); }
+    if (isLoggedIn) { renderNav(); navigateTo(currentView); }
+    else renderLoginScreen();
   }
 
-  // Expose globals
+  function renderLoginScreen() {
+    document.getElementById('loginTitle').textContent = t().adminLogin;
+    document.getElementById('loginSubtitle').textContent = t().welcomeBack;
+    document.getElementById('loginBtn').textContent = t().login;
+    document.getElementById('loginPwLabel').textContent = t().password;
+  }
+
+  // Expose to global scope for inline handlers
+  window.navigateTo = navigateTo;
+  window.assignTeam = assignTeam;
+  window.deleteOrder = deleteOrder;
+  window.updateServiceDate = updateServiceDate;
+  window.viewReport = openReportModal;
+  window.openReportModal = openReportModal;
+  window.closeModal = closeModal;
+  window.openPhoto = openPhoto;
+  window.toggleLang = toggleLang;
   window.login = login;
   window.logout = logout;
-  window.openJob = openJob;
-  window.gotoStep = gotoStep;
-  window.markArrived = markArrived;
-  window.gotoReportStep = gotoReportStep;
-  window.handlePhoto = handlePhoto;
-  window.clearSig = clearSig;
-  window.showDisclaimer = showDisclaimer;
-  window.submitReport = submitReport;
-  window.toggleLang = toggleLang;
-  window.openPhoto = openPhoto;
-  window.renderOrderList = renderOrderList;
 
+  // Init
   document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
     initFirebase();
-    checkIOSInstall();
-
     document.getElementById('loginBtn').addEventListener('click', login);
-    document.getElementById('teamPw').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+    document.getElementById('loginPw').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
     document.getElementById('photoOverlay').onclick = () => {
       document.getElementById('photoOverlay').style.display = 'none';
     };
-
-    // Check saved login - delay to ensure Firebase is ready
-    const saved = localStorage.getItem('sl_team');
-    if (saved) {
-      currentTeam = JSON.parse(saved);
-      showApp();
-      setTimeout(() => {
-        startOrderListener();
-        startGPS();
-      }, 500);
-    }
+    document.getElementById('reportModal').onclick = e => {
+      if (e.target === document.getElementById('reportModal')) closeModal();
+    };
+    renderLoginScreen();
   });
 </script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   :root {
-    --bg: #0D0D14;
-    --surface: #16161F;
-    --surface2: #1E1E2A;
-    --border: #28283C;
+    --bg: #0A0A0F;
+    --surface: #12121A;
+    --surface2: #1A1A26;
+    --border: #2A2A3E;
     --accent: #E86B3E;
-    --text: #EEEEF8;
-    --text2: #7878A0;
+    --accent2: #3E8BE8;
+    --text: #F0F0F8;
+    --text2: #8888A8;
     --success: #3EBE6B;
     --danger: #E83E3E;
-    --warning: #E8C43E;
-    --radius: 14px;
+    --warning: #E8A83E;
+    --radius: 12px;
+    --nav-w: 220px;
   }
 
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; overflow: hidden; }
 
   /* LOGIN */
   #loginScreen {
     display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; padding: 1.5rem;
-    background: var(--bg);
-    background-image: radial-gradient(ellipse at 30% 70%, #E86B3E0C 0%, transparent 55%),
-                      radial-gradient(ellipse at 70% 10%, #3E8BE80C 0%, transparent 55%);
+    height: 100vh; background: var(--bg);
+    background-image: radial-gradient(ellipse at 20% 50%, #E86B3E0A 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 20%, #3E8BE80A 0%, transparent 60%);
   }
   .login-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 24px; padding: 2.5rem; width: 100%; max-width: 380px;
-    box-shadow: 0 40px 80px #00000050;
+    border-radius: 20px; padding: 3rem; width: 380px; max-width: 90vw;
+    box-shadow: 0 40px 80px #00000060;
   }
-  .login-logo { font-family: 'Space Mono', monospace; color: var(--accent); font-size: 1.1rem; margin-bottom: 1.5rem; }
-  .login-title { font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }
-  .login-sub { color: var(--text2); margin-bottom: 2rem; font-size: .9rem; }
-  .login-label { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text2); margin-bottom: .4rem; }
-  .login-select, .login-input {
-    width: 100%; padding: .8rem 1rem; background: var(--surface2);
+  .login-logo { font-family: 'Space Mono', monospace; font-size: 1.5rem; color: var(--accent); margin-bottom: .5rem; }
+  .login-title { font-size: 1.6rem; font-weight: 700; margin-bottom: .25rem; }
+  .login-subtitle { color: var(--text2); margin-bottom: 2rem; }
+  .login-label { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text2); margin-bottom: .5rem; }
+  .login-input {
+    width: 100%; padding: .85rem 1rem; background: var(--surface2);
     border: 1px solid var(--border); border-radius: var(--radius);
-    color: var(--text); font-size: .95rem; font-family: inherit;
-    margin-bottom: 1rem; transition: border-color .2s;
-  }
-  .login-select:focus, .login-input:focus { outline: none; border-color: var(--accent); }
-  .login-select option { background: var(--surface2); }
-  .login-btn {
-    width: 100%; padding: .9rem; background: var(--accent);
-    border: none; border-radius: var(--radius); color: white;
-    font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
-    transition: opacity .2s;
-  }
-  .login-btn:hover { opacity: .9; }
-  .login-lang-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-family: inherit; font-size: .85rem; width: 100%; margin-top: .75rem; }
-
-  /* APP */
-  #appScreen { display: none; flex-direction: column; min-height: 100vh; }
-  #appHeader {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: .85rem 1.25rem; position: sticky; top: 0; z-index: 50; flex-shrink: 0;
-  }
-  .header-brand { display: flex; align-items: center; gap: .5rem; }
-  .header-title { font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700; }
-  .header-right { display: flex; align-items: center; gap: .5rem; }
-  .team-pill { font-size: .75rem; padding: .3rem .75rem; border-radius: 999px; font-weight: 600; }
-  .icon-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1.1rem; padding: .25rem; }
-
-  #mainContent { flex: 1; overflow-y: auto; padding: 1rem 1rem 2rem; max-width: 600px; margin: 0 auto; width: 100%; }
-
-  /* ORDER LIST */
-  .list-header { margin-bottom: 1.25rem; }
-  .list-header h1 { font-size: 1.4rem; font-weight: 700; }
-  .day-section { margin-bottom: 1.5rem; }
-  .day-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text2); margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
-
-  .order-card-team {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1.1rem; margin-bottom: .75rem;
-    cursor: pointer; transition: border-color .2s, transform .1s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .order-card-team:active { transform: scale(.99); }
-  .order-card-team:hover { border-color: var(--accent)50; }
-  .order-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .5rem; }
-  .order-num-team { font-family: 'Space Mono', monospace; font-size: .95rem; font-weight: 700; }
-  .order-customer-team { font-size: .9rem; color: var(--text2); margin-top: .1rem; }
-  .status-dot { font-size: .7rem; padding: .25rem .65rem; border-radius: 999px; font-weight: 600; white-space: nowrap; }
-  .order-address-team { font-size: .82rem; color: var(--text2); margin-bottom: .75rem; }
-  .order-actions-team { display: flex; gap: .5rem; align-items: center; }
-  .card-btn { padding: .45rem .9rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; }
-  .btn-pdf { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-  .btn-start { background: var(--accent); color: white; margin-left: auto; }
-  .btn-done { background: var(--success)15; color: var(--success); border: 1px solid var(--success)30; margin-left: auto; }
-
-  /* JOB FLOW */
-  .job-header { margin-bottom: 1.25rem; }
-  .back-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-family: inherit; font-size: .9rem; padding: 0; margin-bottom: .5rem; display: block; }
-  .job-title { font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700; }
-  .job-customer { color: var(--text2); font-size: .9rem; margin-top: .15rem; }
-
-  /* STEPS */
-  .steps-bar { display: flex; align-items: center; margin-bottom: 1.5rem; }
-  .step-item { display: flex; flex-direction: column; align-items: center; gap: .25rem; flex-shrink: 0; cursor: pointer; }
-  .step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; transition: all .2s; }
-  .step-item.active .step-num { background: var(--accent); border-color: var(--accent); color: white; }
-  .step-label { font-size: .65rem; color: var(--text2); text-align: center; max-width: 70px; line-height: 1.2; }
-  .step-item.active .step-label { color: var(--text); }
-  .step-line { flex: 1; height: 2px; background: var(--border); margin: 0 .5rem; margin-bottom: .9rem; transition: background .2s; }
-  .step-line.active { background: var(--accent); }
-
-  /* CARDS */
-  .step-body { display: flex; flex-direction: column; gap: 1rem; }
-  .info-card, .section-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1.1rem;
-  }
-  .info-card h3, .section-card h3 { font-size: .85rem; font-weight: 600; margin-bottom: .75rem; }
-  .info-card p { font-size: .85rem; color: var(--text2); margin-bottom: .35rem; }
-  .pdf-link { display: inline-flex; align-items: center; gap: .3rem; margin-top: .5rem; font-size: .82rem; color: var(--accent); text-decoration: none; }
-
-  .photos-grid { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
-  .photo-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
-  .photo-btn {
-    display: inline-flex; align-items: center; gap: .4rem;
-    background: var(--surface2); border: 1px dashed var(--border);
-    border-radius: 8px; padding: .6rem 1rem; cursor: pointer;
-    font-size: .82rem; color: var(--text2); transition: all .15s;
-  }
-  .photo-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* FORM */
-  .form-group { margin-bottom: .85rem; }
-  .form-group label, .form-label { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text2); margin-bottom: .35rem; }
-  .form-input {
-    width: 100%; padding: .7rem .9rem; background: var(--surface2);
-    border: 1px solid var(--border); border-radius: 10px;
-    color: var(--text); font-family: inherit; font-size: .9rem;
+    color: var(--text); font-size: 1rem; font-family: inherit;
     transition: border-color .2s;
   }
-  .form-input:focus { outline: none; border-color: var(--accent); }
-  .form-textarea {
-    width: 100%; padding: .7rem .9rem; background: var(--surface2);
-    border: 1px solid var(--border); border-radius: 10px;
-    color: var(--text); font-family: inherit; font-size: .9rem;
-    resize: vertical; transition: border-color .2s;
+  .login-input:focus { outline: none; border-color: var(--accent); }
+  .login-btn {
+    width: 100%; margin-top: 1.5rem; padding: .9rem;
+    background: var(--accent); border: none; border-radius: var(--radius);
+    color: white; font-size: 1rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: opacity .2s, transform .1s;
   }
-  .form-textarea:focus { outline: none; border-color: var(--accent); }
+  .login-btn:hover { opacity: .9; }
+  .login-btn:active { transform: scale(.99); }
+  .login-lang { margin-top: 1rem; text-align: center; }
+  .login-lang button { background: none; border: none; color: var(--text2); cursor: pointer; font-family: inherit; font-size: .85rem; }
 
-  .radio-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-  .radio-opt { display: flex; align-items: center; gap: .4rem; font-size: .85rem; cursor: pointer; }
-  .radio-opt input { accent-color: var(--accent); }
+  /* APP SHELL */
+  #appScreen { display: none; height: 100vh; flex-direction: column; }
 
-  /* STATUS OPTIONS */
-  .status-options { display: flex; flex-direction: column; gap: .5rem; }
-  .status-opt { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-radius: 10px; border: 2px solid var(--border); cursor: pointer; font-size: .9rem; transition: all .15s; }
-  .status-opt:has(input:checked) { border-color: var(--accent); background: var(--accent)08; }
-  .completed-opt:has(input:checked) { border-color: var(--success); background: var(--success)08; }
-  .failed-opt:has(input:checked) { border-color: var(--danger); background: var(--danger)08; }
-  .status-opt input { accent-color: var(--accent); }
-
-  .check-opt { display: flex; align-items: center; gap: .5rem; font-size: .85rem; margin-bottom: .35rem; cursor: pointer; }
-  .check-opt input { accent-color: var(--accent); }
-
-  /* DISCLAIMER */
-  .disclaimer-toggle-card { border-color: var(--warning)40; }
-  .disclaimer-card { border-color: var(--warning)60; background: var(--warning)05; }
-  .disclaimer-text { font-size: .85rem; line-height: 1.6; color: var(--text2); margin-bottom: .75rem; padding: .75rem; background: var(--surface2); border-radius: 8px; border-left: 3px solid var(--warning); }
-
-  /* SIGNATURES */
-  .sig-instruction { font-size: .8rem; color: var(--text2); margin-bottom: .5rem; }
-  .sig-container { position: relative; }
-  .sig-canvas {
-    width: 100%; height: 160px; border-radius: 10px; border: 1.5px solid var(--border);
-    background: white; cursor: crosshair; touch-action: none; display: block;
+  /* NAV */
+  #navBar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 1rem; padding: 0 1.5rem;
+    height: 60px; flex-shrink: 0; overflow-x: auto;
   }
-  .clear-sig-btn {
-    position: absolute; top: .5rem; right: .5rem;
+  .nav-brand { display: flex; align-items: center; gap: .5rem; margin-right: 1rem; flex-shrink: 0; }
+  .brand-icon { font-size: 1.2rem; }
+  .brand-name { font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700; }
+  .brand-role { font-size: .65rem; background: var(--accent); color: white; padding: .2rem .5rem; border-radius: 999px; }
+  .nav-items { display: flex; gap: .25rem; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: .4rem; padding: .5rem .9rem;
+    background: none; border: none; color: var(--text2); cursor: pointer;
+    border-radius: 8px; font-family: inherit; font-size: .85rem;
+    transition: all .15s; white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent)15; color: var(--accent); }
+  .nav-actions { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+  .lang-toggle {
     background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 6px; padding: .25rem .6rem; font-size: .72rem;
-    color: var(--text2); cursor: pointer; font-family: inherit;
+    color: var(--text); padding: .35rem .75rem; border-radius: 8px;
+    cursor: pointer; font-family: inherit; font-size: .8rem;
   }
+  .logout-btn {
+    background: none; border: 1px solid var(--border); color: var(--text2);
+    padding: .35rem .75rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: .8rem;
+    transition: all .15s;
+  }
+  .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
 
-  /* BUTTONS */
-  .primary-btn {
-    width: 100%; padding: 1rem; background: var(--accent);
-    border: none; border-radius: var(--radius); color: white;
-    font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
-    transition: opacity .2s, transform .1s;
-  }
-  .primary-btn:hover { opacity: .9; }
-  .primary-btn:active { transform: scale(.99); }
-  .primary-btn:disabled { opacity: .5; cursor: default; }
-  .submit-btn { background: var(--success); margin-top: .5rem; }
+  /* MAIN */
+  #mainContent { flex: 1; overflow-y: auto; padding: 1.5rem; }
 
-  /* EMPTY STATE */
-  .empty-state {
-    text-align: center; padding: 4rem 2rem;
-    display: flex; flex-direction: column; align-items: center; gap: 1rem;
-    color: var(--text2);
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.6rem; font-weight: 700; }
+
+  .stats-row { display: flex; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+  .stat-chip {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: .6rem 1rem; min-width: 100px;
   }
+  .stat-chip span { display: block; font-size: 1.5rem; font-weight: 700; font-family: 'Space Mono', monospace; }
+  .stat-chip label { font-size: .7rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+  .stat-chip.completed { border-color: var(--success)40; }
+  .stat-chip.completed span { color: var(--success); }
+  .stat-chip.pending { border-color: var(--warning)40; }
+  .stat-chip.pending span { color: var(--warning); }
+  .stat-chip.active { border-color: var(--accent2)40; }
+  .stat-chip.active span { color: var(--accent2); }
+
+  /* ORDERS */
+  .section-title { font-size: .85rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text2); margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+  .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .order-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; transition: border-color .2s; }
+  .order-card:hover { border-color: var(--accent)40; }
+  .order-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .order-number { font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700; }
+  .order-status { font-size: .7rem; padding: .25rem .6rem; border-radius: 999px; font-weight: 600; }
+  .order-body { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1rem; }
+  .order-field label { display: block; font-size: .7rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .25rem; }
+  .order-field span { font-size: .9rem; }
+  .date-input, .team-select {
+    width: 100%; padding: .5rem .75rem; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    font-family: inherit; font-size: .85rem; cursor: pointer;
+  }
+  .date-input:focus, .team-select:focus { outline: none; border-color: var(--accent); }
+  .team-badge { font-size: .75rem; padding: .3rem .6rem; border-radius: 6px; display: inline-block; margin-top: .25rem; }
+  .order-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .btn-sm { padding: .35rem .75rem; border-radius: 6px; border: none; cursor: pointer; font-size: .75rem; font-family: inherit; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; transition: opacity .15s; }
+  .btn-sm:hover { opacity: .8; }
+  .btn-view { background: var(--accent2)15; color: var(--accent2); border: 1px solid var(--accent2)30; }
+  .btn-report { background: var(--success)15; color: var(--success); border: 1px solid var(--success)30; }
+  .btn-delete { background: var(--danger)15; color: var(--danger); border: 1px solid var(--danger)30; }
+
+  /* UPLOAD */
+  .upload-container { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; max-width: 900px; }
+  @media (max-width: 700px) { .upload-container { grid-template-columns: 1fr; } }
+  .upload-area {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 4rem 2rem; text-align: center; cursor: pointer;
+    transition: all .2s; background: var(--surface);
+  }
+  .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: var(--accent)08; }
+  .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .upload-title { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+  .upload-sub { color: var(--text2); font-size: .85rem; }
+  .upload-processing { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+  .spin { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .upload-help { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+  .upload-help h3 { margin-bottom: .75rem; }
+  .upload-help p { color: var(--text2); font-size: .85rem; line-height: 1.6; }
+
+  /* REPORTS */
+  .reports-list { display: flex; flex-direction: column; gap: .75rem; }
+  .report-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; transition: border-color .2s;
+  }
+  .report-row:hover { border-color: var(--accent)40; }
+  .report-info { display: flex; align-items: center; gap: 1.5rem; }
+  .report-order { font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700; min-width: 120px; }
+  .report-customer { font-size: .9rem; }
+  .report-date { font-size: .8rem; color: var(--text2); }
+  .report-right { display: flex; align-items: center; gap: 1rem; }
+  .report-status { font-size: .75rem; padding: .2rem .6rem; border-radius: 999px; }
+  .report-status.completed { background: var(--success)15; color: var(--success); }
+  .report-status.failed { background: var(--danger)15; color: var(--danger); }
+  .chevron { color: var(--text2); font-size: 1.2rem; }
+
+  /* MAP */
+  .map-layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; height: calc(100vh - 200px); }
+  @media (max-width: 700px) { .map-layout { grid-template-columns: 1fr; height: auto; } }
+  .team-locations-list { display: flex; flex-direction: column; gap: .75rem; overflow-y: auto; }
+  .location-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; display: flex; gap: .75rem; }
+  .team-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: .25rem; flex-shrink: 0; }
+  .location-info { flex: 1; }
+  .location-team { font-weight: 600; margin-bottom: .25rem; }
+  .location-coords { font-family: 'Space Mono', monospace; font-size: .75rem; color: var(--text2); }
+  .location-time { font-size: .75rem; color: var(--text2); margin-bottom: .5rem; }
+  .map-placeholder { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; }
+  .map-note { text-align: center; padding: 2rem; max-width: 300px; }
+  .map-note p { color: var(--text2); margin-top: .75rem; line-height: 1.6; font-size: .9rem; }
+
+  /* MODAL */
+  #reportModal {
+    display: none; position: fixed; inset: 0;
+    background: #00000080; z-index: 100;
+    align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; width: 100%; max-width: 700px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .modal-header h2 { font-size: 1.2rem; }
+  .modal-close { background: none; border: none; color: var(--text2); font-size: 1.2rem; cursor: pointer; }
+  .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .report-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 500px) { .report-detail-grid { grid-template-columns: 1fr; } }
+  .detail-section { background: var(--surface2); border-radius: 10px; padding: 1rem; }
+  .detail-section h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text2); margin-bottom: .5rem; }
+  .detail-section p { font-size: .9rem; line-height: 1.5; }
+  .disclaimer-section { border: 1px solid var(--warning)40; background: var(--warning)08; }
+  .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: .5rem; }
+  .thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; cursor: pointer; transition: transform .15s; }
+  .thumb:hover { transform: scale(1.05); }
+  .sig-preview { width: 100%; max-width: 300px; border-radius: 8px; border: 1px solid var(--border); background: white; }
 
   /* PHOTO OVERLAY */
-  #photoOverlay {
-    display: none; position: fixed; inset: 0;
-    background: #000000E0; z-index: 200;
-    align-items: center; justify-content: center;
-  }
+  #photoOverlay { display: none; position: fixed; inset: 0; background: #000000E0; z-index: 200; align-items: center; justify-content: center; }
   #fullPhoto { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
 
   /* TOAST */
-  #toastContainer { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: .5rem; width: 90%; max-width: 340px; }
-  .toast { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1.25rem; font-size: .85rem; transform: translateY(20px); opacity: 0; transition: all .3s; text-align: center; }
+  #toastContainer { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 300; display: flex; flex-direction: column; gap: .5rem; }
+  .toast { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: .75rem 1.25rem; font-size: .85rem; transform: translateY(20px); opacity: 0; transition: all .3s; max-width: 300px; }
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast-success { border-color: var(--success)50; color: var(--success); }
   .toast-error { border-color: var(--danger)50; color: var(--danger); }
-  .toast-info { border-color: var(--accent)50; color: var(--accent); }
 
-  .job-address { font-size:.82rem; color:var(--text2); margin-top:.2rem; }
+  .empty { color: var(--text2); padding: 2rem; text-align: center; }
+  .empty-state { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 3rem; text-align: center; color: var(--text2); }
 
-  /* DOWNLOAD OVERLAY */
-  .download-overlay {
-    position:fixed; inset:0; background:#000000C0; z-index:300;
-    display:flex; align-items:center; justify-content:center; padding:1.5rem;
-  }
-  .download-card {
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:20px; padding:2.5rem 2rem; text-align:center;
-    width:100%; max-width:360px; display:flex; flex-direction:column; gap:.75rem;
-  }
-  .download-card h2 { font-size:1.3rem; }
-  .download-btn {
-    display:block; width:100%; padding:.9rem;
-    background:var(--accent)15; color:var(--accent);
-    border:1px solid var(--accent)40; border-radius:var(--radius);
-    font-size:.9rem; font-weight:600; text-decoration:none;
-    transition:opacity .15s;
-  }
-  .download-btn:hover { opacity:.8; }
-  .download-close {
-    background:none; border:1px solid var(--border);
-    color:var(--text2); border-radius:var(--radius);
-    padding:.7rem; cursor:pointer; font-family:inherit; font-size:.85rem; margin-top:.5rem;
-  }
-
-
+  /* ── LIGHT MODE ──────────────────────────────────────────── */
   body.light {
-    --bg: #F2F2F8;
+    --bg: #F4F4F8;
     --surface: #FFFFFF;
-    --surface2: #EAEAF2;
-    --border: #D8D8E8;
+    --surface2: #EEEEF4;
+    --border: #DDDDE8;
     --text: #0A0A18;
-    --text2: #666688;
+    --text2: #6666880;
   }
-  body.light .sig-canvas { border-color: #CCCCDD; }
-  body.light .login-card { box-shadow: 0 20px 60px #00000015; }
+  body.light { --text2: #666688; }
 
-  .theme-toggle-btn {
-    background: none; border: none; font-size: 1.1rem;
-    cursor: pointer; padding: .25rem; color: var(--text2);
-    transition: color .15s;
+  .theme-toggle {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: .3rem .5rem;
+    cursor: pointer; display: flex; align-items: center; gap: .3rem;
+    font-size: .8rem; color: var(--text2); transition: all .2s;
+    white-space: nowrap;
   }
-  .theme-toggle-btn:hover { color: var(--text); }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* SYNC INDICATOR */
-  .sync-pill {
-    display: inline-flex; align-items: center; gap: .35rem;
-    padding: .25rem .6rem; border-radius: 999px;
-    font-size: .7rem; font-weight: 600; transition: all .3s;
+  /* ── SYNC INDICATOR ─────────────────────────────────────── */
+  .sync-bar {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .3rem .75rem; border-radius: 20px;
+    font-size: .75rem; font-weight: 600; transition: all .3s;
+    white-space: nowrap;
   }
-  .sync-pill.synced { background: var(--success)15; color: var(--success); }
-  .sync-pill.syncing { background: var(--warning)15; color: var(--warning); }
-  .sync-pill.offline { background: var(--danger)15; color: var(--danger); }
-  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .sync-dot.pulse { animation: pulse 1.2s infinite; }
+  .sync-bar.synced { background: var(--success)15; color: var(--success); border: 1px solid var(--success)30; }
+  .sync-bar.syncing { background: var(--warning)15; color: var(--warning); border: 1px solid var(--warning)30; }
+  .sync-bar.offline { background: var(--danger)15; color: var(--danger); border: 1px solid var(--danger)30; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .sync-dot.pulse { animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
-  @keyframes spin { to{transform:rotate(360deg)} }
 
-
-  /* INSTALL BANNER */
+  /* ── INSTALL PROMPT ─────────────────────────────────────── */
   .install-banner {
     position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
     background: var(--surface); border: 1px solid var(--accent)50;
-    border-radius: 16px; padding: 1rem 1.25rem;
-    display: flex; align-items: center; gap: .75rem;
-    box-shadow: 0 8px 32px #00000030; z-index: 400;
-    width: calc(100% - 2rem); max-width: 400px;
+    border-radius: 14px; padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: 1rem;
+    box-shadow: 0 8px 32px #00000030; z-index: 200;
+    width: calc(100% - 2rem); max-width: 420px;
     animation: slideUp .3s ease;
   }
-  .install-text strong { display: block; font-size: .9rem; }
-  .install-text span { font-size: .78rem; color: var(--text2); }
-  .install-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: .5rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; font-family: inherit; flex-shrink: 0; }
-  .install-x { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1rem; padding: .2rem; flex-shrink: 0; }
+  @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
+  .install-banner-text { flex: 1; }
+  .install-banner-text strong { display: block; font-size: .9rem; margin-bottom: .15rem; }
+  .install-banner-text span { font-size: .78rem; color: var(--text2); }
+  .install-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: .5rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .install-dismiss { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1.1rem; padding: .2rem; }
+
+  /* ── CHECK-IN TABLE ─────────────────────────────────────── */
+  .checkin-table { width: 100%; border-collapse: collapse; }
+  .checkin-table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text2); padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  .checkin-table td { padding: .7rem .75rem; border-bottom: 1px solid var(--border); font-size: .85rem; }
+  .checkin-table tr:last-child td { border-bottom: none; }
+  .checkin-table tr:hover td { background: var(--surface2); }
+  .checkin-status { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; }
+  .checkin-status.arrived { background: var(--success)15; color: var(--success); }
+  .checkin-status.working { background: var(--accent2)15; color: var(--accent2); }
+  .checkin-status.done { background: var(--text2)15; color: var(--text2); }
+  .checkin-time { font-family: "Space Mono", monospace; font-size: .78rem; color: var(--text2); }
+
+
+  .report-controls { display:flex; gap:.75rem; margin-top:1rem; flex-wrap:wrap; align-items:center; }
+  .search-input {
+    flex:1; min-width:180px; padding:.55rem .9rem;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:inherit; font-size:.85rem;
+  }
+  .search-input:focus { outline:none; border-color:var(--accent); }
+  .filter-select {
+    padding:.55rem .75rem; background:var(--surface2);
+    border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:inherit; font-size:.85rem; cursor:pointer;
+  }
+  .filter-select:focus { outline:none; border-color:var(--accent); }
 
 </style>
 </head>
@@ -1495,31 +1358,33 @@
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">⚡ Smart Logistics</div>
-    <div class="login-title">Team Login</div>
-    <div class="login-sub">Vælg dit team og log ind</div>
-
-    <label class="login-label">Team</label>
-    <select class="login-select" id="teamSelect">
-      <option value="">— Vælg team —</option>
-      <option value="team1">Team 1</option>
-      <option value="team2">Team 2</option>
-      <option value="team3">Team 3</option>
-      <option value="team4">Team 4</option>
-      <option value="team5">Team 5</option>
-    </select>
-
-    <label class="login-label">Adgangskode</label>
-    <input type="password" class="login-input" id="teamPw" placeholder="••••••••">
-
+    <div class="login-title" id="loginTitle">Administrator Login</div>
+    <div class="login-subtitle" id="loginSubtitle">Velkommen tilbage</div>
+    <label class="login-label" id="loginPwLabel">Adgangskode</label>
+    <input type="password" class="login-input" id="loginPw" placeholder="••••••••">
     <button class="login-btn" id="loginBtn">Log ind</button>
-    <button class="login-lang-btn" onclick="toggleLang()">🌐 Skift sprog / Change language</button>
+    <div class="login-lang" style="margin-top:.5rem">
+      <button onclick="showForgotModal()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:.8rem">
+        🔑 Glemt adgangskode?
+      </button>
+    </div>
+    <div class="login-lang">
+      <button onclick="toggleLang()">🌐 Skift sprog / Change language</button>
+    </div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="appScreen">
-  <header id="appHeader"></header>
+  <nav id="navBar"></nav>
   <main id="mainContent"></main>
+</div>
+
+<!-- REPORT MODAL -->
+<div id="reportModal">
+  <div class="modal-card">
+    <div id="reportModalContent"></div>
+  </div>
 </div>
 
 <!-- PHOTO OVERLAY -->
