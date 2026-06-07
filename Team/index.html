@@ -816,9 +816,13 @@
       const wallRefuse = document.querySelector('input[name="wallRefuse"]:checked')?.value === 'yes';
       const completedAt = new Date().toISOString();
       let techSigUrl = null, customerSigUrl = null, disclaimerSigUrl = null;
-      if (techSigData) techSigUrl = await uploadDataURL(techSigData, `sigs/${currentOrder.id}/tech.png`);
-      if (customerSigData) customerSigUrl = await uploadDataURL(customerSigData, `sigs/${currentOrder.id}/customer.png`);
-      if (disclaimerSigData) disclaimerSigUrl = await uploadDataURL(disclaimerSigData, `sigs/${currentOrder.id}/disclaimer.png`);
+      try {
+        if (techSigData && techSigData.length > 100) techSigUrl = await uploadDataURL(techSigData, 'sigs/' + currentOrder.id + '/tech.png');
+        if (customerSigData && customerSigData.length > 100) customerSigUrl = await uploadDataURL(customerSigData, 'sigs/' + currentOrder.id + '/customer.png');
+        if (disclaimerSigData && disclaimerSigData.length > 100) disclaimerSigUrl = await uploadDataURL(disclaimerSigData, 'sigs/' + currentOrder.id + '/disclaimer.png');
+      } catch(sigErr) {
+        console.warn('Signatur upload fejl:', sigErr);
+      }
       const reportData = {
         orderId: currentOrder.id, orderNumber: currentOrder.orderNumber,
         customerName: currentOrder.customerName || '',
@@ -1089,8 +1093,14 @@
   }
 
   async function uploadDataURL(dataUrl, path) {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
+    // Convert data URL to blob without fetch (more reliable cross-browser)
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) u8arr[n] = bstr.charCodeAt(n);
+    const blob = new Blob([u8arr], { type: mime });
     const storageRef = ref(storage, path);
     const snap = await uploadBytes(storageRef, blob);
     return getDownloadURL(snap.ref);
@@ -1108,7 +1118,7 @@
           <table style="border-collapse:collapse; width:100%; font-family:sans-serif">
             <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Ordre</b></td><td style="padding:8px; border-bottom:1px solid #eee">#${report.orderNumber}</td></tr>
             <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Kunde</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.customerName}</td></tr>
-            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Adresse</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.customerAddress}</td></tr>
+            <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Adresse</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.customerAddress1 || report.customerAddress || ""}</td></tr>
             <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Team</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.teamName}</td></tr>
             <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Status</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.serviceStatus}</td></tr>
             <tr><td style="padding:8px; border-bottom:1px solid #eee"><b>Start</b></td><td style="padding:8px; border-bottom:1px solid #eee">${report.startTime}</td></tr>
@@ -1453,6 +1463,10 @@
   .sync-pill.offline { background: var(--danger)15; color: var(--danger); }
   .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .sync-dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
 
   /* INSTALL BANNER */
   .install-banner {
