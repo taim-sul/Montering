@@ -792,7 +792,10 @@
 
   function renderPhotoThumbs(photos) {
     if (!photos.length) return '<p style="opacity:.4; font-size:.8rem; padding:.5rem 0">Ingen billeder endnu</p>';
-    return photos.map(url => `<img src="${url}" class="photo-thumb" onclick="openPhoto('${url}')">`).join('');
+    return photos.map(url => {
+      const safe = encodeURIComponent(url);
+      return '<img src="' + url + '" class="photo-thumb" onclick="openPhoto(decodeURIComponent(\'' + safe + '\'))">';
+    }).join('');
   }
 
   function openPhoto(url) {
@@ -809,7 +812,7 @@
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = t().saving;
     try {
-      const failReasons = [...document.querySelectorAll('input[name="failReason"]:checked')].map(c => c.value);
+      const failedReasons = [...document.querySelectorAll('input[name="failReason"]:checked')].map(c => c.value);
       const incompleteReasons = [...document.querySelectorAll('input[name="incompleteReason"]:checked')].map(c => c.value);
       const addSvc = document.querySelector('input[name="addSvc"]:checked')?.value === 'yes';
       const contactedIkea = document.querySelector('input[name="ikea"]:checked')?.value === 'yes';
