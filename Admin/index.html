@@ -410,10 +410,7 @@
   }
 
   // ── ASSIGN TEAM ───────────────────────────────────────────────
-  async function assignTeam(orderId, teamId) {
-    // Read the date live from the DOM to avoid stale render-time values
-    const card = document.querySelector(`.order-card[data-id="${orderId}"]`);
-    const serviceDate = card?.querySelector('.date-input')?.value || getTomorrow();
+  async function assignTeam(orderId, teamId, serviceDate) {
     try {
       await updateDoc(doc(db, 'orders', orderId), {
         teamId,
@@ -482,6 +479,7 @@
         </button>
       </div>
       <div class="nav-actions">
+        <button class="btn-sm btn-delete" onclick="showClearDataModal()" style="white-space:nowrap" title="${currentLang==='da'?'Ryd alle data':'Clear all data'}">🗑 ${currentLang==='da'?'Ryd data':'Clear data'}</button>
         <div id="syncIndicator" class="sync-bar syncing"><div class="sync-dot pulse"></div>${currentLang==='da'?'Synkroniserer...':'Syncing...'}</div>
         <button class="theme-toggle" onclick="toggleTheme()">${currentTheme==='dark'?'☀️ Lyst':'🌙 Mørkt'}</button>
         <button class="lang-toggle" onclick="toggleLang()">${currentLang === 'da' ? '🇬🇧 EN' : '🇩🇰 DA'}</button>
@@ -551,7 +549,7 @@
           </div>
           <div class="order-field">
             <label>${t().team}</label>
-            <select class="team-select" onchange="assignTeam('${order.id}', this.value)">
+            <select class="team-select" onchange="assignTeam('${order.id}', this.value, '${order.serviceDate || getTomorrow()}')">
               <option value="">${t().selectTeam}</option>
               ${TEAMS.map(tm => `<option value="${tm.id}" ${order.teamId === tm.id ? 'selected' : ''}>${tm.name}</option>`).join('')}
             </select>
@@ -603,25 +601,89 @@
     main.innerHTML = `
       <div class="page-header">
         <h1>${t().reports}</h1>
+        <div class="report-controls">
+          <input type="text" id="reportSearch" placeholder="${currentLang==='da'?'Søg ordre, kunde...':'Search order, customer...'}"
+            class="search-input" oninput="filterReports()">
+          <select id="reportTeamFilter" class="filter-select" onchange="filterReports()">
+            <option value="">${currentLang==='da'?'Alle teams':'All teams'}</option>
+            ${TEAMS.map(tm => '<option value="'+tm.id+'">'+tm.name+'</option>').join('')}
+          </select>
+          <select id="reportStatusFilter" class="filter-select" onchange="filterReports()">
+            <option value="">${currentLang==='da'?'Alle statuser':'All statuses'}</option>
+            <option value="completed">${t().completed}</option>
+            <option value="failed">${t().failed}</option>
+            <option value="incomplete">Ufuldstændig</option>
+          </select>
+          <button class="btn-sm btn-view" onclick="exportReportsCSV()" style="white-space:nowrap">📊 CSV</button>
+        </div>
       </div>
-      <div class="reports-list">
-        ${reportsData.length ? reportsData.map(r => renderReportRow(r)).join('') : `<div class="empty-state"><p>${t().noOrders}</p></div>`}
+      <div class="reports-list" id="reportsList">
+        ${reportsData.length ? reportsData.map(r => renderReportRow(r)).join('') : '<div class="empty-state"><p>' + t().noOrders + '</p></div>'}
       </div>
     `;
   }
 
+  function filterReports() {
+    const search = document.getElementById('reportSearch')?.value.toLowerCase() || '';
+    const team = document.getElementById('reportTeamFilter')?.value || '';
+    const status = document.getElementById('reportStatusFilter')?.value || '';
+    const filtered = reportsData.filter(r => {
+      const matchSearch = !search ||
+        (r.orderNumber||'').toLowerCase().includes(search) ||
+        (r.customerName||'').toLowerCase().includes(search) ||
+        (r.teamName||'').toLowerCase().includes(search);
+      const matchTeam = !team || r.teamId === team;
+      const matchStatus = !status || r.serviceStatus === status;
+      return matchSearch && matchTeam && matchStatus;
+    });
+    const list = document.getElementById('reportsList');
+    if (list) list.innerHTML = filtered.length
+      ? filtered.map(r => renderReportRow(r)).join('')
+      : '<div class="empty-state"><p>' + (currentLang==='da'?'Ingen resultater':'No results') + '</p></div>';
+  }
+
+  function exportReportsCSV() {
+    const headers = ['Ordre','Kunde','Adresse','Team','Status','Start','Slut','Timer','Montører','Kommentarer','Dato'];
+    const rows = reportsData.map(r => [
+      r.orderNumber||'', r.customerName||'', r.customerAddress1||'',
+      r.teamName||'', r.serviceStatus||'', r.startTime||'', r.endTime||'',
+      r.hoursSpent||'', r.numAssemblers||'', (r.comments||'').replace(/,/g,' '),
+      r.completedAt ? new Date(r.completedAt).toLocaleDateString('da-DK') : ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'rapporter_' + new Date().toLocaleDateString('da-DK').replace(/\//g,'-') + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+    showToast('CSV eksporteret', 'success');
+  }
+  window.exportReportsCSV = exportReportsCSV;
+
+  async function deleteReport(reportId) {
+    if (!confirm(currentLang==='da'?'Slet denne rapport?':'Delete this report?')) return;
+    try {
+      await deleteDoc(doc(db, 'reports', reportId));
+      showToast(currentLang==='da'?'Rapport slettet':'Report deleted', 'success');
+    } catch(e) { showToast('Fejl ved sletning', 'error'); }
+  }
+  window.deleteReport = deleteReport;
+
   function renderReportRow(report) {
-    const team = TEAMS.find(t => t.id === report.teamId);
+    const team = TEAMS.find(tm => tm.id === report.teamId);
+    const statusColors = { completed: 'var(--success)', failed: 'var(--danger)', incomplete: 'var(--warning)' };
+    const color = statusColors[report.serviceStatus] || 'var(--text2)';
     return `
       <div class="report-row" onclick="openReportModal('${report.id}')">
         <div class="report-info">
-          <div class="report-order">#${report.orderNumber}</div>
+          <div class="report-order">#${report.orderNumber || '—'}</div>
           <div class="report-customer">${report.customerName || '—'}</div>
           <div class="report-date">${report.completedAt ? new Date(report.completedAt).toLocaleDateString('da-DK') : '—'}</div>
         </div>
         <div class="report-right">
-          ${team ? `<div class="team-badge" style="background:${team.color}20; color:${team.color}">● ${team.name}</div>` : ''}
-          <div class="report-status ${report.serviceStatus}">${getStatusLabel(report.serviceStatus)}</div>
+          ${team ? '<div class="team-badge" style="background:'+team.color+'20; color:'+team.color+'">● '+team.name+'</div>' : ''}
+          <div class="report-status" style="color:${color};background:${color}15;border:1px solid ${color}30;font-size:.7rem;padding:.2rem .6rem;border-radius:999px;font-weight:600">${getStatusLabel(report.serviceStatus)}</div>
+          <button class="btn-sm btn-delete" onclick="event.stopPropagation(); deleteReport('${report.id}')" style="padding:.25rem .5rem">🗑</button>
           <span class="chevron">›</span>
         </div>
       </div>
@@ -808,6 +870,126 @@
     });
     setSyncState('synced');
   }
+
+
+  // ── CLEAR ALL DATA ───────────────────────────────────────────
+  const SECRET_DELETE_CODE = "SLET2024";
+  const SECRET_RECOVERY_CODE = "ADMIN2024";
+
+  function showClearDataModal() {
+    const modal = document.createElement('div');
+    modal.id = 'clearDataModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:#000000AA;z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border:2px solid var(--danger);border-radius:20px;padding:2rem;max-width:420px;width:100%">
+        <div style="font-size:2.5rem;text-align:center;margin-bottom:1rem">⚠️</div>
+        <h2 style="color:var(--danger);text-align:center;margin-bottom:.5rem">${currentLang==='da'?'Slet alle data':'Delete all data'}</h2>
+        <p style="color:var(--text2);font-size:.85rem;text-align:center;margin-bottom:1.5rem">
+          ${currentLang==='da'?'Dette sletter ALLE ordrer, rapporter og lokationer permanent. Handling kan ikke fortrydes.':'This permanently deletes ALL orders, reports and locations. This cannot be undone.'}
+        </p>
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Indtast sletningskode':'Enter delete code'}
+        </label>
+        <input id="deleteCodeInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--danger)50;border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:1rem">
+        <div style="display:flex;gap:.75rem">
+          <button onclick="document.getElementById('clearDataModal').remove()"
+            style="flex:1;padding:.8rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-family:inherit">
+            ${currentLang==='da'?'Annuller':'Cancel'}
+          </button>
+          <button onclick="confirmClearData()"
+            style="flex:1;padding:.8rem;background:var(--danger);border:none;border-radius:10px;color:white;cursor:pointer;font-family:inherit;font-weight:700">
+            ${currentLang==='da'?'Slet alt':'Delete all'}
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('deleteCodeInput').focus();
+  }
+  window.showClearDataModal = showClearDataModal;
+
+  async function confirmClearData() {
+    const code = document.getElementById('deleteCodeInput')?.value;
+    if (code !== SECRET_DELETE_CODE) {
+      showToast(currentLang==='da'?'Forkert kode':'Wrong code', 'error');
+      return;
+    }
+    document.getElementById('clearDataModal').remove();
+    showToast(currentLang==='da'?'Sletter data...':'Deleting data...', 'info');
+    try {
+      const cols = ['orders','reports','locations','mail'];
+      for (const col of cols) {
+        const snap = await getDocs(collection(db, col));
+        const deletes = snap.docs.map(d => deleteDoc(doc(db, col, d.id)));
+        await Promise.all(deletes);
+      }
+      showToast(currentLang==='da'?'Alle data slettet':'All data deleted', 'success');
+      navigateTo('orders');
+    } catch(e) {
+      showToast('Fejl: ' + e.message, 'error');
+    }
+  }
+  window.confirmClearData = confirmClearData;
+
+  // ── FORGOT PASSWORD ──────────────────────────────────────────
+  function showForgotModal() {
+    const modal = document.createElement('div');
+    modal.id = 'forgotModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:#000000AA;z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;max-width:400px;width:100%">
+        <h2 style="margin-bottom:.5rem">${currentLang==='da'?'Glemt adgangskode':'Forgot password'}</h2>
+        <p style="color:var(--text2);font-size:.85rem;margin-bottom:1.5rem">
+          ${currentLang==='da'?'Indtast gendannelseskoden for at nulstille din adgangskode.':'Enter the recovery code to reset your password.'}
+        </p>
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Gendannelseskode':'Recovery code'}
+        </label>
+        <input id="recoveryCodeInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:.75rem">
+        <label style="display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:.4rem">
+          ${currentLang==='da'?'Ny adgangskode':'New password'}
+        </label>
+        <input id="newPasswordInput" type="password" placeholder="••••••••"
+          style="width:100%;padding:.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;margin-bottom:1rem">
+        <div style="display:flex;gap:.75rem">
+          <button onclick="document.getElementById('forgotModal').remove()"
+            style="flex:1;padding:.8rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-family:inherit">
+            ${currentLang==='da'?'Annuller':'Cancel'}
+          </button>
+          <button onclick="confirmPasswordReset()"
+            style="flex:1;padding:.8rem;background:var(--accent);border:none;border-radius:10px;color:white;cursor:pointer;font-family:inherit;font-weight:700">
+            ${currentLang==='da'?'Nulstil':'Reset'}
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  window.showForgotModal = showForgotModal;
+
+  async function confirmPasswordReset() {
+    const code = document.getElementById('recoveryCodeInput')?.value;
+    const newPw = document.getElementById('newPasswordInput')?.value;
+    if (code !== SECRET_RECOVERY_CODE) {
+      showToast(currentLang==='da'?'Forkert gendannelseskode':'Wrong recovery code', 'error');
+      return;
+    }
+    if (!newPw || newPw.length < 6) {
+      showToast(currentLang==='da'?'Adgangskode skal være mindst 6 tegn':'Password must be at least 6 characters', 'error');
+      return;
+    }
+    try {
+      const { updatePassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      await updatePassword(auth.currentUser, newPw);
+      document.getElementById('forgotModal').remove();
+      showToast(currentLang==='da'?'Adgangskode opdateret!':'Password updated!', 'success');
+    } catch(e) {
+      showToast('Fejl: ' + e.message, 'error');
+    }
+  }
+  window.confirmPasswordReset = confirmPasswordReset;
 
   function showToast(msg, type = 'info') {
     const t = document.createElement('div');
@@ -1153,6 +1335,21 @@
   .checkin-status.done { background: var(--text2)15; color: var(--text2); }
   .checkin-time { font-family: "Space Mono", monospace; font-size: .78rem; color: var(--text2); }
 
+
+  .report-controls { display:flex; gap:.75rem; margin-top:1rem; flex-wrap:wrap; align-items:center; }
+  .search-input {
+    flex:1; min-width:180px; padding:.55rem .9rem;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-family:inherit; font-size:.85rem;
+  }
+  .search-input:focus { outline:none; border-color:var(--accent); }
+  .filter-select {
+    padding:.55rem .75rem; background:var(--surface2);
+    border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:inherit; font-size:.85rem; cursor:pointer;
+  }
+  .filter-select:focus { outline:none; border-color:var(--accent); }
+
 </style>
 </head>
 <body>
@@ -1166,6 +1363,11 @@
     <label class="login-label" id="loginPwLabel">Adgangskode</label>
     <input type="password" class="login-input" id="loginPw" placeholder="••••••••">
     <button class="login-btn" id="loginBtn">Log ind</button>
+    <div class="login-lang" style="margin-top:.5rem">
+      <button onclick="showForgotModal()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:.8rem">
+        🔑 Glemt adgangskode?
+      </button>
+    </div>
     <div class="login-lang">
       <button onclick="toggleLang()">🌐 Skift sprog / Change language</button>
     </div>
